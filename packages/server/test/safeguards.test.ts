@@ -54,7 +54,7 @@ async function invite(by: string, name: string) {
   return enroll(mailer.sent.at(-1)!.text.match(/#invite=([\w-]+)/)![1]!);
 }
 
-const people: Record<string, { auth: SoftAuthenticator; cookie: string }> = {};
+const people = {} as Record<'ivy' | 'tom' | 'late', { auth: SoftAuthenticator; cookie: string }>;
 
 beforeAll(async () => {
   const db = new SqliteDb(':memory:');
