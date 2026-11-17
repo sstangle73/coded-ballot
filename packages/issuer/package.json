@@ -1,0 +1,29 @@
+{
+  "name": "@coded-ballot/issuer",
+  "version": "0.1.0",
+  "description": "coded-ballot issuer tool: runs on the issuer's own computer, never from the public server",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "coded-ballot-issuer": "src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "issuer": "node src/cli.ts"
+  },
+  "dependencies": {
+    "@coded-ballot/core": "0.1.0",
+    "nodemailer": "^10.6.0",
+    "pdf-lib": "^1.17.1",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
+    "@types/qrcode": "^1.5.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

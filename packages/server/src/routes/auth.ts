@@ -57,11 +57,19 @@ export const loadStaff: MiddlewareHandler<Env> = async (c, next) => {
   await next();
 };
 
-/** Only signed-in staff with one of these roles, from this server's own origin. */
+/** Only signed-in staff with one of these roles, from this server's own origin. Tool tokens are refused. */
 export function requireRole(...roles: Role[]): MiddlewareHandler<Env> {
+  return gate(roles, false);
+}
+
+/** The issuer tool's routes: an issuer's passkey session, or a tool token made by an issuer. */
+export const issuerTool: MiddlewareHandler<Env> = gate(['issuer'], true);
+
+function gate(roles: Role[], allowToken: boolean): MiddlewareHandler<Env> {
   return async (c, next) => {
     const s = c.get('staff');
     if (!s) fail(401, 'Sign in with your passkey first.');
+    if (c.get('bearer') && !allowToken) fail(403, 'Tool tokens only work for the issuer tool. Sign in with your passkey.');
     if (!roles.some((r) => s.roles.includes(r))) fail(403, `This needs the ${roles.join(' or ')} role.`);
     if (c.req.method !== 'GET' && !c.get('bearer')) {
       const origin = c.req.header('origin');
@@ -276,6 +284,9 @@ auth.post('/login/verify', async (c) => {
 auth.post('/logout', async (c) => {
   const t = getCookie(c, SESSION_COOKIE);
   if (t) await deps(c).db.run('DELETE FROM sessions WHERE token_hash = ?', [tokenHash(t)]);
+  // signing out also ends every tool token this person made
+  const s = c.get('staff');
+  if (s && !c.get('bearer')) await deps(c).db.run('DELETE FROM api_tokens WHERE staff_id = ?', [s.id]);
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
   return c.json({ ok: true });
 });
@@ -283,8 +294,7 @@ auth.post('/logout', async (c) => {
 auth.get('/me', (c) => c.json({ staff: c.get('staff') ?? null }));
 
 /** A token for the issuer's local tool, valid for 12 hours. Only from a passkey session, never from another token. */
-auth.post('/tokens', requireRole('issuer', 'teller'), async (c) => {
-  if (c.get('bearer')) fail(403, 'Make tool tokens from the staff page, signed in with your passkey.');
+auth.post('/tokens', requireRole('issuer'), async (c) => {
   const { db, now } = deps(c);
   const b = await body<{ label?: string }>(c);
   const token = randomToken();

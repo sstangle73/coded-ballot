@@ -12,3 +12,4 @@ export * from './spend.ts';
 export * from './lot.ts';
 export * from './count/index.ts';
 export { sodium } from './sodium.ts';
+export * from './layout.ts';

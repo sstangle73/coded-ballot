@@ -1,0 +1,7 @@
+member_id,name,class,email,shares,address_line1,address_line2,city,state,zip,large_print,provisional
+M001,Ana Example,full,ana@example.org,,1 River Road,,Exampleton,NY,10001,,
+M002,Ben Example,full,,,2 River Road,Apt 3,Exampleton,NY,10001,yes,
+M003,Cai Example,associate,cai@example.org,,3 Hill Street,,Exampleton,NY,10002,,
+M004,Dee Example,owner,dee@example.org,12.5,4 Hill Street,,Exampleton,NY,10002,,
+M005,Eli Example,owner,,3,5 Lake Lane,,Exampleton,NY,10003,,
+M006,Fay Example,full,fay@example.org,,6 Lake Lane,,Exampleton,NY,10003,,yes

@@ -107,6 +107,22 @@ describe('a whole election', () => {
     expect((await call('POST', '/api/auth/register/options', { body: { invite: link } })).status).toBe(410); // used
   });
 
+  it('gives the local tool a bearer token, made only from a passkey session', async () => {
+    const t = await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: { label: 'test' } });
+    expect(t.status).toBe(200);
+    const res = await app.request('/api/auth/me', { headers: { authorization: `Bearer ${t.json.token}` } });
+    expect(((await res.json()) as any).staff.name).toBe('Issa Issuer');
+    const again = await app.request('/api/auth/tokens', { method: 'POST', headers: { authorization: `Bearer ${t.json.token}`, 'content-type': 'application/json' }, body: '{}' });
+    expect(again.status).toBe(403);
+    // a tool token can't invite people or act as a teller
+    const inv = await app.request('/api/auth/invite', { method: 'POST', headers: { authorization: `Bearer ${t.json.token}`, 'content-type': 'application/json' }, body: JSON.stringify({ name: 'Y', email: 'y@example.org', roles: ['issuer'] }) });
+    expect(inv.status).toBe(403);
+    // only issuers make tool tokens
+    expect((await call('POST', '/api/auth/tokens', { cookie: tellerCookie, body: {} })).status).toBe(403);
+    const bad = await app.request('/api/auth/me', { headers: { authorization: 'Bearer ' + 'x'.repeat(43) } });
+    expect(bad.status).toBe(401);
+  });
+
   it('refuses staff actions from another origin', async () => {
     const r = await call('POST', '/api/staff/elections', { cookie: issuerCookie, origin: 'https://evil.test', body: { rulesYaml: RULES } });
     expect(r.status).toBe(403);

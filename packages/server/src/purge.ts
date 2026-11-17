@@ -31,5 +31,6 @@ export async function purgeDue(d: Deps): Promise<string[]> {
   // housekeeping for sign-in
   await d.db.run('DELETE FROM challenges WHERE expires_at < ?', [now.toISOString()]);
   await d.db.run('DELETE FROM sessions WHERE expires_at < ?', [now.toISOString()]);
+  await d.db.run('DELETE FROM api_tokens WHERE expires_at < ?', [now.toISOString()]);
   return purged;
 }

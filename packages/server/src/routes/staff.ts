@@ -17,7 +17,7 @@ import {
   type CloseStatement,
 } from '@coded-ballot/core';
 import { body, deps, ELECTION, fail, HEX64, str, STYLE, type C, type Env } from '../context.ts';
-import { requireRole } from './auth.ts';
+import { issuerTool, requireRole } from './auth.ts';
 import { getElection, lockedVotes, log, logStmt, requireStatus, SqlSpendStore } from '../store.ts';
 import type { Stmt } from '../db/types.ts';
 
@@ -78,7 +78,7 @@ staff.put('/e/:id/rules', issuer, async (c) => {
 });
 
 /** The roll frozen at notice: member IDs and emails only, for online links. Names and addresses stay with the issuer. */
-staff.post('/e/:id/roll', issuer, async (c) => {
+staff.post('/e/:id/roll', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'setup');
@@ -108,7 +108,7 @@ staff.post('/e/:id/roll', issuer, async (c) => {
 });
 
 /** A change after the freeze: listed for the tellers, and a changed email is reported to the old address. */
-staff.post('/e/:id/roll/changes', issuer, async (c) => {
+staff.post('/e/:id/roll/changes', issuerTool, async (c) => {
   const { db, now, mailer } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'setup', 'open');
@@ -150,7 +150,7 @@ staff.post('/e/:id/roll/changes', issuer, async (c) => {
 });
 
 /** The issuer uploads hash(S) and style for each code, and the public half of the signing key. */
-staff.post('/e/:id/codes', issuer, async (c) => {
+staff.post('/e/:id/codes', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'setup');
@@ -173,7 +173,7 @@ staff.post('/e/:id/codes', issuer, async (c) => {
 });
 
 /** Reissue: revoke copy n and issue copy n + 1, together. The public log shows only that a reissue happened. */
-staff.post('/e/:id/codes/reissue', issuer, async (c) => {
+staff.post('/e/:id/codes/reissue', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'setup', 'open');
@@ -202,7 +202,7 @@ staff.post('/e/:id/codes/reissue', issuer, async (c) => {
 });
 
 /** The issuer records destroying every copy of the passphrase (after close, before the box is opened). */
-staff.post('/e/:id/key-destroyed', issuer, async (c) => {
+staff.post('/e/:id/key-destroyed', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'closed');
@@ -210,7 +210,7 @@ staff.post('/e/:id/key-destroyed', issuer, async (c) => {
   return c.json({ ok: true });
 });
 
-staff.post('/e/:id/passphrase-backup', issuer, async (c) => {
+staff.post('/e/:id/passphrase-backup', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'setup');
@@ -285,14 +285,14 @@ staff.post('/e/:id/receipts', teller, async (c) => {
 });
 
 /** What the issuer signs at close: the fingerprint of every locked vote. The votes themselves stay gated. */
-staff.get('/e/:id/close/prepare', issuer, async (c) => {
+staff.get('/e/:id/close/prepare', issuerTool, async (c) => {
   const { db } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'open');
   return c.json(lockedVotesDigest(await lockedVotes(db, e.row.id)));
 });
 
-staff.post('/e/:id/close', issuer, async (c) => {
+staff.post('/e/:id/close', issuerTool, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'open');
