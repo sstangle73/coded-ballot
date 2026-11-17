@@ -33,6 +33,18 @@ function addHours(d: Date, h: number) {
 
 /** Loads the signed-in staff member, if any. */
 export const loadStaff: MiddlewareHandler<Env> = async (c, next) => {
+  const bearer = /^Bearer ([\w-]{20,100})$/.exec(c.req.header('authorization') ?? '')?.[1];
+  if (bearer) {
+    const { db, now } = deps(c);
+    const r = await db.first<StaffRow>(
+      'SELECT s.id, s.name, s.email, s.roles FROM api_tokens x JOIN staff s ON s.id = x.staff_id WHERE x.token_hash = ? AND x.expires_at > ?',
+      [tokenHash(bearer), now().toISOString()],
+    );
+    if (!r) fail(401, 'That tool token has expired. Make a new one on the staff page.');
+    c.set('staff', toStaff(r));
+    c.set('bearer', true);
+    return next();
+  }
   const t = getCookie(c, SESSION_COOKIE);
   if (t) {
     const { db, now } = deps(c);
@@ -51,7 +63,7 @@ export function requireRole(...roles: Role[]): MiddlewareHandler<Env> {
     const s = c.get('staff');
     if (!s) fail(401, 'Sign in with your passkey first.');
     if (!roles.some((r) => s.roles.includes(r))) fail(403, `This needs the ${roles.join(' or ')} role.`);
-    if (c.req.method !== 'GET') {
+    if (c.req.method !== 'GET' && !c.get('bearer')) {
       const origin = c.req.header('origin');
       if (origin && origin !== deps(c).config.publicOrigin) fail(403, 'Staff actions must come from this server’s own pages.');
     }
@@ -269,6 +281,21 @@ auth.post('/logout', async (c) => {
 });
 
 auth.get('/me', (c) => c.json({ staff: c.get('staff') ?? null }));
+
+/** A token for the issuer's local tool, valid for 12 hours. Only from a passkey session, never from another token. */
+auth.post('/tokens', requireRole('issuer', 'teller'), async (c) => {
+  if (c.get('bearer')) fail(403, 'Make tool tokens from the staff page, signed in with your passkey.');
+  const { db, now } = deps(c);
+  const b = await body<{ label?: string }>(c);
+  const token = randomToken();
+  await db.run('INSERT INTO api_tokens (token_hash, staff_id, label, expires_at) VALUES (?, ?, ?, ?)', [
+    tokenHash(token),
+    c.get('staff')!.id,
+    (b.label ?? 'issuer tool').slice(0, 80),
+    addHours(now(), 12),
+  ]);
+  return c.json({ token, expiresInHours: 12 });
+});
 
 auth.get('/staff', requireRole('issuer', 'teller'), async (c) => {
   const rows = await deps(c).db.all<StaffRow>('SELECT id, name, email, roles FROM staff ORDER BY name');

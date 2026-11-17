@@ -108,17 +108,20 @@ pub.post('/e/:id/online/request-link', async (c) => {
   if (!fresh && v.link_window_count >= LINKS_PER_HOUR) return c.json(answer);
   const token = randomToken();
   const expires = new Date(Math.min(now().getTime() + LINK_HOURS * 3600_000, Date.parse(e.rules.dates.voting_closes))).toISOString();
-  await db.batch([
+  const res = await db.batch([
     {
       sql: 'UPDATE voters SET link_window_start = ?, link_window_count = ? WHERE election_id = ? AND member_id = ?',
       params: [fresh ? now().toISOString() : v.link_window_start, fresh ? 1 : v.link_window_count + 1, e.row.id, v.member_id],
     },
     { sql: 'DELETE FROM voter_links WHERE election_id = ? AND expires_at <= ?', params: [e.row.id, now().toISOString()] },
     {
-      sql: 'INSERT INTO voter_links (token_hash, election_id, member_id, expires_at) VALUES (?, ?, ?, ?)',
-      params: [tokenHash(token), e.row.id, v.member_id, expires],
+      // only if the address is still this member's (it may have changed since the read above)
+      sql: `INSERT INTO voter_links (token_hash, election_id, member_id, expires_at)
+            SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM voters WHERE election_id = ? AND member_id = ? AND email = ? AND used IS NULL)`,
+      params: [tokenHash(token), e.row.id, v.member_id, expires, e.row.id, v.member_id, email],
     },
   ]);
+  if (res[2]!.changes !== 1) return c.json(answer);
   const link = `${config.votingPageUrl}#s=${encodeURIComponent(config.publicOrigin)}&e=${encodeURIComponent(e.row.id)}&t=${token}`;
   await mailer.send({
     to: email,

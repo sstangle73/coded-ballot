@@ -38,7 +38,7 @@ export interface Staff {
   roles: Role[];
 }
 
-export type Env = { Variables: { deps: Deps; staff?: Staff } };
+export type Env = { Variables: { deps: Deps; staff?: Staff; bearer?: boolean } };
 export type C = Context<Env>;
 
 export function deps(c: C): Deps {

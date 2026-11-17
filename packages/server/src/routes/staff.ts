@@ -123,15 +123,17 @@ staff.post('/e/:id/roll/changes', issuer, async (c) => {
       now().toISOString(),
     ]);
     if (ch.kind === 'email_changed') {
-      if (ch.newEmail) {
-        await db.run(
-          `INSERT INTO voters (election_id, member_id, email) VALUES (?, ?, ?)
-           ON CONFLICT (election_id, member_id) DO UPDATE SET email = excluded.email`,
-          [e.row.id, memberId, ch.newEmail.toLowerCase()],
-        );
-      } else await db.run('DELETE FROM voters WHERE election_id = ? AND member_id = ? AND used IS NULL', [e.row.id, memberId]);
-      // links already sent to the old address stop working
-      await db.run('DELETE FROM voter_links WHERE election_id = ? AND member_id = ?', [e.row.id, memberId]);
+      // the new address and the end of links already sent to the old one happen together
+      await db.batch([
+        ch.newEmail
+          ? {
+              sql: `INSERT INTO voters (election_id, member_id, email) VALUES (?, ?, ?)
+                    ON CONFLICT (election_id, member_id) DO UPDATE SET email = excluded.email`,
+              params: [e.row.id, memberId, ch.newEmail.toLowerCase()],
+            }
+          : { sql: 'DELETE FROM voters WHERE election_id = ? AND member_id = ? AND used IS NULL', params: [e.row.id, memberId] },
+        { sql: 'DELETE FROM voter_links WHERE election_id = ? AND member_id = ?', params: [e.row.id, memberId] },
+      ]);
       if (ch.oldEmail) {
         await mailer.send({
           to: ch.oldEmail,
@@ -196,6 +198,15 @@ staff.post('/e/:id/codes/reissue', issuer, async (c) => {
     fail(409, !r ? 'The old code isn’t known.' : r.state === 'spent' ? 'The old code was already used: that member has voted.' : 'The old code was already replaced.');
   }
   await log(db, e.row.id, now(), 'reissue');
+  return c.json({ ok: true });
+});
+
+/** The issuer records destroying every copy of the passphrase (after close, before the box is opened). */
+staff.post('/e/:id/key-destroyed', issuer, async (c) => {
+  const { db, now } = deps(c);
+  const e = await getElection(db, c.req.param('id'));
+  requireStatus(e, 'closed');
+  await log(db, e.row.id, now(), 'issuer_key_destroyed', { by: c.get('staff')!.name });
   return c.json({ ok: true });
 });
 
