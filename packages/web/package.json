@@ -1,0 +1,26 @@
+{
+  "name": "@coded-ballot/web",
+  "version": "0.1.0",
+  "description": "coded-ballot pages: the voting page, the tellers' app, the public page and the member checker",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "vite build && node scripts/release-hashes.ts",
+    "dev": "vite",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coded-ballot/core": "0.1.0",
+    "@simplewebauthn/browser": "^14.0.0",
+    "jsqr": "^1.4.0",
+    "tlock-js": "^0.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

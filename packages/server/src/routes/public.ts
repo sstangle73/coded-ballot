@@ -176,7 +176,7 @@ pub.post('/e/:id/online/vote', async (c) => {
   const token = str(b.token, 'link');
   const hash = str(b.codeHash, 'code', HEX64);
   const styleId = str(b.styleId, 'style', STYLE);
-  const sealed = str(b.sealed, 'locked vote', /^[A-Za-z0-9+/]+=*$/, Math.ceil((MAX_SEALED_BYTES * 4) / 3) + 4);
+  const sealed = str(b.sealed, 'locked vote', /^(?:[A-Za-z0-9+/]+=*|tlock1:[A-Za-z0-9+/=\s-]+)$/, Math.ceil((MAX_SEALED_BYTES * 4) / 3) + 4);
   await voterForToken(c, e, token);
   if (styleId.endsWith('_prov')) fail(409, 'Provisional ballots can only be returned on paper.');
   const nonce = randomToken(16);
@@ -197,8 +197,9 @@ pub.post('/e/:id/online/vote', async (c) => {
       params: [at, nonce, e.row.id, hash, e.row.id, nonce],
     },
     {
+      // stored as "<style>:<sealed>", the style taken from the code's own row, not from the voter
       sql: `INSERT INTO locked_votes (election_id, id, sealed)
-            SELECT ?, ?, ? WHERE EXISTS (SELECT 1 FROM codes WHERE election_id = ? AND spend_nonce = ?)`,
+            SELECT ?, ?, style_id || ':' || ? FROM codes WHERE election_id = ? AND spend_nonce = ?`,
       params: [e.row.id, voteId, sealed, e.row.id, nonce],
     },
     { sql: 'UPDATE codes SET spend_nonce = NULL WHERE election_id = ? AND spend_nonce = ?', params: [e.row.id, nonce] },

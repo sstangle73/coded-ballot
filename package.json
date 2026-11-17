@@ -3,10 +3,15 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "type": "module",
-  "workspaces": ["packages/*"],
-  "engines": { "node": ">=22.12" },
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "demo": "npm run build -w @coded-ballot/web && npm run demo -w @coded-ballot/server"
   }
 }

@@ -14,6 +14,9 @@ import {
   toBase64,
   utf8ToBytes,
   verifyClose,
+  sealVote,
+  sealedBody,
+  unlockVote,
   type IssuerKeys,
 } from '@coded-ballot/core';
 import { createApp } from '../src/app.ts';
@@ -188,7 +191,8 @@ describe('a whole election', () => {
 
     const chk = await call('POST', `/api/public/e/${E}/online/check`, { body: { token, codeHash: hash('M001') } });
     expect(chk.json.style.contests).toEqual(['chair', 'committee', 'motion-1']);
-    const sealed = toBase64(s.crypto_box_seal(utf8ToBytes(JSON.stringify({ chair: ['ana'], committee: ['dee', 'eli'], 'motion-1': ['yes'] })), countKey.publicKey));
+    const sealed = sealedBody(await sealVote({ v: 1, styleId: 'full', selections: { chair: ['ana'], committee: ['dee', 'eli'], 'motion-1': ['yes'] } }, countKey.publicKey));
+    void s;
     const v = await call('POST', `/api/public/e/${E}/online/vote`, { body: { token, codeHash: hash('M001'), styleId: 'full', sealed } });
     expect(v.json.ok, JSON.stringify(v.json)).toBe(true);
     // the link is used up, and so is the code
@@ -210,12 +214,13 @@ describe('a whole election', () => {
     const s = await sodium();
     await call('POST', `/api/public/e/${E}/online/request-link`, { body: { email: 'm002@example.org' } });
     const t2 = mailer.sent.at(-1)!.text.match(/&t=([\w-]+)/)![1]!;
-    const sealed = (x: object) => toBase64(s.crypto_box_seal(utf8ToBytes(JSON.stringify(x)), countKey.publicKey));
-    expect((await call('POST', `/api/public/e/${E}/online/vote`, { body: { token: t2, codeHash: hash('M002'), styleId: 'full', sealed: sealed({ chair: ['ben'] }) } })).json.ok).toBe(true);
+    const sealed = async (x: Record<string, string[]>) => sealedBody(await sealVote({ v: 1, styleId: 'full', selections: x }, countKey.publicKey));
+    void s;
+    expect((await call('POST', `/api/public/e/${E}/online/vote`, { body: { token: t2, codeHash: hash('M002'), styleId: 'full', sealed: await sealed({ chair: ['ben'] }) } })).json.ok).toBe(true);
     await call('POST', `/api/public/e/${E}/online/request-link`, { body: { email: 'm003@example.org' } });
     const t3 = mailer.sent.at(-1)!.text.match(/&t=([\w-]+)/)![1]!;
     // M003 tries M007's already-mailed code: refused, nothing stored, link still usable
-    const bad = await call('POST', `/api/public/e/${E}/online/vote`, { body: { token: t3, codeHash: hash('M007'), styleId: 'full', sealed: sealed({}) } });
+    const bad = await call('POST', `/api/public/e/${E}/online/vote`, { body: { token: t3, codeHash: hash('M007'), styleId: 'full', sealed: await sealed({}) } });
     expect(bad.status).toBe(409);
     expect((await d.db.all('SELECT id FROM locked_votes')).length).toBe(2);
     expect((await call('POST', `/api/public/e/${E}/online/check`, { body: { token: t3, codeHash: hash('M003') } })).status).toBe(200);
@@ -249,8 +254,10 @@ describe('a whole election', () => {
     const r = await call('GET', `/api/staff/e/${E}/locked-votes`, { cookie: tellerCookie });
     expect(r.status).toBe(200);
     expect(await verifyClose(r.json.close, fromBase64(r.json.issuerPublicKey), r.json.lockedVotes)).toEqual({ ok: true, fallback: false });
-    const opened = (r.json.lockedVotes as string[]).map((x) => JSON.parse(new TextDecoder().decode(s.crypto_box_seal_open(fromBase64(x), countKey.publicKey, countKey.privateKey))));
-    expect(opened.map((o) => o.chair[0]).sort()).toEqual(['ana', 'ben']);
+    const opened = await Promise.all((r.json.lockedVotes as string[]).map((x) => unlockVote(x, countKey)));
+    expect(opened.map((o) => o.selections.chair![0]).sort()).toEqual(['ana', 'ben']);
+    expect(opened.every((o) => o.styleId === 'full')).toBe(true);
+    void s;
   });
 
   it('blocks certification until the hand count matches', async () => {

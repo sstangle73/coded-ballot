@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Vote online</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <main>
+    <h1 id="title">Vote online</h1>
+    <p class="sub" id="org"></p>
+    <div id="app" aria-live="polite"><p>Loading&hellip;</p></div>
+    <p class="small">coded-ballot voting page. Your choices are locked in this browser before they are sent, so the
+      website can't read them. <a href="../check/">Check this page is genuine</a>.</p>
+  </main>
+  <script type="module" src="./vote.ts"></script>
+</body>
+</html>

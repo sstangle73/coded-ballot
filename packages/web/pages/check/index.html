@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Check a voting page</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <main>
+    <h1>Check a voting page</h1>
+    <p class="sub">Is your organisation's voting page running exactly the published coded-ballot code?</p>
+    <p>This check runs in your browser, from the project's own site. It downloads the organisation's voting page and
+      compares every file with this release. A fingerprint shown on the voting page itself proves nothing, because a
+      changed page could show the right one.</p>
+    <form id="form">
+      <label for="server">Your organisation's voting server</label>
+      <input id="server" type="text" placeholder="https://ballot.example.org" autocomplete="url">
+      <button type="submit">Check it</button>
+    </form>
+    <div id="out" aria-live="polite"></div>
+    <p class="small">Or skip the organisation's page: vote from <a href="../vote/">this site's own copy</a>, which only
+      locks your vote with the count key printed on your ballot.</p>
+  </main>
+  <script type="module" src="./check.ts"></script>
+</body>
+</html>

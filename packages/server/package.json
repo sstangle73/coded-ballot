@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "build:worker": "node scripts/build-worker.ts",
     "start": "node src/targets/node.ts",
-    "dev:worker": "wrangler dev"
+    "dev:worker": "wrangler dev",
+    "demo": "node scripts/demo.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20261117.1",

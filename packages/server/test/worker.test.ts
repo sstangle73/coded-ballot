@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { codeHash, deriveCode, deriveIssuerKeys, fromBase64, sha256Hex, signClose, sodium, toBase64, utf8ToBytes, verifyClose, type IssuerKeys } from '@coded-ballot/core';
+import { sealedBody, sealVote, codeHash, deriveCode, deriveIssuerKeys, fromBase64, sha256Hex, signClose, sodium, toBase64, utf8ToBytes, verifyClose, type IssuerKeys } from '@coded-ballot/core';
 import { SoftAuthenticator } from './soft-authenticator.ts';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
@@ -119,7 +119,8 @@ describe('Workers target (wrangler dev, D1, R2)', () => {
     await call('POST', `/api/public/e/${E}/online/request-link`, { email: 'b@example.org' });
     const outbox = (await call('GET', '/api/dev/outbox')).json.sent;
     const token = outbox.at(-1).text.match(/&t=([\w-]+)/)[1];
-    const sealed = toBase64(s.crypto_box_seal(utf8ToBytes(JSON.stringify({ chair: ['ben'] })), countKey.publicKey));
+    const sealed = sealedBody(await sealVote({ v: 1, styleId: 'full', selections: { chair: ['ben'] } }, countKey.publicKey));
+    void s;
     const bad = await call('POST', `/api/public/e/${E}/online/vote`, { token, codeHash: hash('A'), styleId: 'full', sealed });
     expect(bad.status).toBe(409);
     const ok = await call('POST', `/api/public/e/${E}/online/vote`, { token, codeHash: hash('B'), styleId: 'full', sealed });

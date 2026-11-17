@@ -25,11 +25,11 @@ export interface SignedClose {
 }
 
 /**
- * Fingerprint of the locked-vote list, in the order the server publishes it. Each entry is the base64 text of one
- * locked vote; the digest covers their bytes, length-prefixed, so entries can't be merged or split.
+ * Fingerprint of the locked-vote list, in the order the server publishes it. Each entry is one stored vote's text
+ * (style and sealed body); the digest covers their bytes, length-prefixed, so entries can't be merged or split.
  */
 export function lockedVotesDigest(lockedVotes: string[]): { count: number; sha256: string } {
-  const parts = lockedVotes.map((v) => lengthPrefixed(fromBase64(v)));
+  const parts = lockedVotes.map((v) => lengthPrefixed(utf8ToBytes(v)));
   return { count: lockedVotes.length, sha256: sha256Hex(concatBytes(lengthPrefixed('coded-ballot/v1/locked-votes'), ...parts)) };
 }
 

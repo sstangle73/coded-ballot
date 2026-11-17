@@ -1,0 +1,54 @@
+/* coded-ballot pages. Colour-blind safe: every status colour comes with a glyph and a word, and the palette uses
+   blue, amber and purple (no red/green pairs). Text meets WCAG 2.1 AA contrast in light and dark. */
+:root {
+  --bg: #ffffff; --fg: #1a1d21; --muted: #4a5260; --line: #c9ced6; --panel: #f4f6f9;
+  --accent: #0b5cad; --accent-fg: #ffffff;
+  --ok-bg: #e3efff; --ok-fg: #0a4a8c;        /* ✓ blue */
+  --warn-bg: #fff2cc; --warn-fg: #6b4700;    /* ▲ amber */
+  --bad-bg: #f6e3f7; --bad-fg: #6d1b72;      /* ✗ purple */
+  --focus: #b35900;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 18px; line-height: 1.5;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171b; --fg: #eef1f5; --muted: #b6bdc8; --line: #3a414b; --panel: #1d2127;
+    --accent: #6fb1ff; --accent-fg: #0b1622;
+    --ok-bg: #0f2a47; --ok-fg: #b9d9ff; --warn-bg: #3a2c00; --warn-fg: #ffd970; --bad-bg: #3a1640; --bad-fg: #f2c2f5; --focus: #ffb057; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); }
+main { max-width: 42rem; margin: 0 auto; padding: 1rem 1rem 4rem; }
+h1 { font-size: 1.6rem; line-height: 1.25; margin: 0.5rem 0 0.25rem; }
+h2 { font-size: 1.25rem; margin: 1.5rem 0 0.5rem; }
+p, li { max-width: 38rem; }
+.sub { color: var(--muted); margin-top: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+label { display: block; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+input[type=text], input[type=email], select, textarea { font: inherit; padding: 0.55rem 0.7rem; border: 2px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); width: 100%; max-width: 26rem; }
+button, .button { font: inherit; font-weight: 600; padding: 0.65rem 1.1rem; min-height: 44px; border-radius: 6px; border: 2px solid var(--accent); background: var(--accent); color: var(--accent-fg); cursor: pointer; margin: 0.5rem 0.5rem 0.5rem 0; text-decoration: none; display: inline-block; }
+button.secondary { background: transparent; color: var(--accent); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 1rem 0; padding: 0.5rem 1rem 1rem; }
+legend { font-weight: 700; font-size: 1.1rem; padding: 0 0.3rem; }
+.choice { display: flex; align-items: center; gap: 0.6rem; padding: 0.35rem 0; font-weight: 400; margin: 0; min-height: 44px; }
+.choice input { width: 1.4rem; height: 1.4rem; }
+.rank-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.3rem 0; }
+.rank-row select { width: 7rem; }
+.fingerprint { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 1.5rem; letter-spacing: 0.08em; font-weight: 700; }
+.code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; letter-spacing: 0.06em; text-transform: uppercase; }
+.status { border-radius: 8px; padding: 0.75rem 1rem; margin: 1rem 0; border: 2px solid currentColor; }
+.status::before { font-weight: 800; margin-right: 0.4rem; }
+.status.ok { background: var(--ok-bg); color: var(--ok-fg); } .status.ok::before { content: "\2713  OK:"; }
+.status.warn { background: var(--warn-bg); color: var(--warn-fg); } .status.warn::before { content: "\25B2  Check:"; }
+.status.bad { background: var(--bad-bg); color: var(--bad-fg); } .status.bad::before { content: "\2717  Problem:"; }
+.status.info { background: var(--panel); color: var(--fg); border-color: var(--line); } .status.info::before { content: "\25CF"; }
+table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; }
+th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.hidden { display: none !important; }
+.small { font-size: 0.85rem; color: var(--muted); }
+.steps { color: var(--muted); font-size: 0.9rem; }
+video, canvas.preview { width: 100%; max-width: 32rem; border-radius: 8px; border: 1px solid var(--line); background: #000; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

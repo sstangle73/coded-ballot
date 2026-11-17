@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>Election page</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <main>
+    <h1 id="title">Election page</h1>
+    <p class="sub" id="org"></p>
+    <section class="panel" aria-labelledby="track-h">
+      <h2 id="track-h" style="margin-top:0">Check your ballot</h2>
+      <form id="track">
+        <label for="code">The code printed on your ballot</label>
+        <input id="code" type="text" class="code" autocomplete="off" spellcheck="false">
+        <button type="submit">Check</button>
+      </form>
+      <div id="track-result" aria-live="polite"></div>
+      <p class="small">Your code is checked in this browser and only its fingerprint is sent.</p>
+    </section>
+    <div id="app" aria-live="polite"><p>Loading&hellip;</p></div>
+  </main>
+  <script type="module" src="./public.ts"></script>
+</body>
+</html>
