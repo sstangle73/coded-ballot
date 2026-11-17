@@ -115,6 +115,8 @@ describe('a whole election', () => {
   it('creates the election and refuses to open it until everything is ready', async () => {
     const r = await call('POST', '/api/staff/elections', { cookie: issuerCookie, body: { rulesYaml: RULES } });
     expect(r.status, JSON.stringify(r.json)).toBe(200);
+    // a teller can't hand out the issuer role
+    expect((await call('POST', '/api/auth/invite', { cookie: tellerCookie, body: { name: 'X', email: 'x@example.org', roles: ['issuer'] } })).status).toBe(403);
     const o = await call('POST', `/api/staff/e/${E}/open`, { cookie: issuerCookie });
     expect(o.status).toBe(409);
     expect(o.json.error).toMatch(/codes have not been uploaded.*passphrase.*roll.*count key/);
@@ -160,9 +162,10 @@ describe('a whole election', () => {
     const s = await sodium();
     const ask = await call('POST', `/api/public/e/${E}/online/request-link`, { body: { email: 'M001@example.org' }, origin: 'https://project.test' });
     expect(ask.json.ok).toBe(true);
+    await call('POST', `/api/public/e/${E}/online/request-link`, { body: { email: 'm001@example.org' } }); // asks again: the first link must still work
     const nobody = await call('POST', `/api/public/e/${E}/online/request-link`, { body: { email: 'nobody@example.org' } });
     expect(nobody.json).toEqual(ask.json); // same answer either way
-    const mail = mailer.sent.at(-1)!;
+    const mail = mailer.sent.at(-2)!; // the first link M001 got
     expect(mail.to).toBe('m001@example.org');
     const token = mail.text.match(/&t=([\w-]+)/)![1]!;
     expect(mail.text).toContain('https://project.test/vote/#s=https%3A%2F%2Fballot.test&e=agm-2027&t=');
@@ -180,7 +183,8 @@ describe('a whole election', () => {
     expect((await call('GET', `/api/public/e/${E}/track/${hash('M001')}`)).json).toEqual({ status: 'cast_online' });
     // nothing in the database links the member, the code and the vote
     const voter = await d.db.first<Record<string, unknown>>('SELECT * FROM voters WHERE member_id = ?', ['M001']);
-    expect(voter).toMatchObject({ used: 'used', link_token_hash: null });
+    expect(voter).toMatchObject({ used: 'used' });
+    expect(await d.db.first('SELECT * FROM voter_links WHERE member_id = ?', ['M001'])).toBeNull();
     expect(await d.db.first('SELECT * FROM codes WHERE spend_nonce IS NOT NULL')).toBeNull();
     const lv = await d.db.all<Record<string, unknown>>('SELECT * FROM locked_votes');
     expect(Object.keys(lv[0]!).sort()).toEqual(['election_id', 'id', 'sealed']);

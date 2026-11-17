@@ -146,6 +146,9 @@ auth.post('/invite', requireRole('issuer', 'teller'), async (c) => {
   const b = await body<{ name?: string; email?: string; roles?: string[] }>(c);
   const roles = (b.roles ?? []).filter((r): r is Role => r === 'issuer' || r === 'teller');
   if (!roles.length) fail(400, 'Choose issuer, teller or both.');
+  const mine = c.get('staff')!.roles;
+  const extra = roles.filter((r) => !mine.includes(r));
+  if (extra.length) fail(403, `You can only give roles you hold yourself (not ${extra.join(', ')}).`);
   const email = str(b.email, 'email', EMAIL, 200).toLowerCase();
   const existing = await db.first<{ id: string }>('SELECT id FROM staff WHERE email = ?', [email]);
   const id = existing?.id ?? randomToken(12);

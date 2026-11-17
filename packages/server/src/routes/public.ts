@@ -8,7 +8,7 @@ import { getElection, lockedVotes, SqlSpendStore, type Election } from '../store
 export const pub = new Hono<Env>();
 
 const LINK_HOURS = 72;
-const MAX_LINK_REQUESTS = 5;
+const LINKS_PER_HOUR = 3;
 const MAX_SEALED_BYTES = 64 * 1024;
 
 function info(e: Election) {
@@ -98,17 +98,27 @@ pub.post('/e/:id/online/request-link', async (c) => {
   const b = await body<{ email?: string }>(c);
   const email = str(b.email, 'email', /^[^\s@]+@[^\s@]+\.[^\s@]+$/, 200).toLowerCase();
   const answer = { ok: true, message: 'If that address is on the roll for online voting, a link is on its way. It works once.' };
-  const v = await db.first<{ member_id: string; used: string | null; link_requests: number }>(
-    'SELECT member_id, used, link_requests FROM voters WHERE election_id = ? AND email = ?',
+  const v = await db.first<{ member_id: string; used: string | null; link_window_start: string | null; link_window_count: number }>(
+    'SELECT member_id, used, link_window_start, link_window_count FROM voters WHERE election_id = ? AND email = ?',
     [e.row.id, email],
   );
-  if (!v || v.used || v.link_requests >= MAX_LINK_REQUESTS) return c.json(answer);
+  if (!v || v.used) return c.json(answer);
+  const hourAgo = new Date(now().getTime() - 3600_000).toISOString();
+  const fresh = !v.link_window_start || v.link_window_start < hourAgo;
+  if (!fresh && v.link_window_count >= LINKS_PER_HOUR) return c.json(answer);
   const token = randomToken();
   const expires = new Date(Math.min(now().getTime() + LINK_HOURS * 3600_000, Date.parse(e.rules.dates.voting_closes))).toISOString();
-  await db.run(
-    'UPDATE voters SET link_token_hash = ?, link_expires_at = ?, link_requests = link_requests + 1 WHERE election_id = ? AND member_id = ? AND used IS NULL',
-    [tokenHash(token), expires, e.row.id, v.member_id],
-  );
+  await db.batch([
+    {
+      sql: 'UPDATE voters SET link_window_start = ?, link_window_count = ? WHERE election_id = ? AND member_id = ?',
+      params: [fresh ? now().toISOString() : v.link_window_start, fresh ? 1 : v.link_window_count + 1, e.row.id, v.member_id],
+    },
+    { sql: 'DELETE FROM voter_links WHERE election_id = ? AND expires_at <= ?', params: [e.row.id, now().toISOString()] },
+    {
+      sql: 'INSERT INTO voter_links (token_hash, election_id, member_id, expires_at) VALUES (?, ?, ?, ?)',
+      params: [tokenHash(token), e.row.id, v.member_id, expires],
+    },
+  ]);
   const link = `${config.votingPageUrl}#s=${encodeURIComponent(config.publicOrigin)}&e=${encodeURIComponent(e.row.id)}&t=${token}`;
   await mailer.send({
     to: email,
@@ -116,7 +126,7 @@ pub.post('/e/:id/online/request-link', async (c) => {
     text:
       `${e.rules.election.organisation}: ${e.rules.election.title}\n\n` +
       `Open this link, then type the code printed on your ballot:\n\n${link}\n\n` +
-      `The link works once and expires ${expires.slice(0, 16).replace('T', ' ')} UTC. Asking for a new link cancels this one.\n` +
+      `The link expires ${expires.slice(0, 16).replace('T', ' ')} UTC, or as soon as you have voted.\n` +
       `Before you vote, check that the count key fingerprint on the page matches the one printed on your ballot.\n\n` +
       `${e.rules.notice_wording.report_misuse}\n\nIf you didn't ask for this link, you can ignore this email.`,
   });
@@ -125,12 +135,14 @@ pub.post('/e/:id/online/request-link', async (c) => {
 
 async function voterForToken(c: C, e: Election, token: string) {
   const { db, now } = deps(c);
-  const v = await db.first<{ member_id: string; used: string | null; link_expires_at: string }>(
-    'SELECT member_id, used, link_expires_at FROM voters WHERE election_id = ? AND link_token_hash = ?',
+  const v = await db.first<{ member_id: string; used: string | null; expires_at: string }>(
+    `SELECT v.member_id, v.used, l.expires_at FROM voter_links l
+     JOIN voters v ON v.election_id = l.election_id AND v.member_id = l.member_id
+     WHERE l.election_id = ? AND l.token_hash = ?`,
     [e.row.id, tokenHash(token)],
   );
-  if (!v || v.used) fail(410, 'This voting link has already been used or replaced by a newer one.');
-  if (v.link_expires_at <= now().toISOString()) fail(410, 'This voting link has expired. Ask for a new one.');
+  if (!v || v.used) fail(410, 'This voting link has already been used: you have voted online.');
+  if (v.expires_at <= now().toISOString()) fail(410, 'This voting link has expired. Ask for a new one.');
   return v;
 }
 
@@ -170,9 +182,10 @@ pub.post('/e/:id/online/vote', async (c) => {
   const th = tokenHash(token);
   const res = await db.batch([
     {
-      sql: `UPDATE voters SET used = ? WHERE election_id = ? AND link_token_hash = ? AND used IS NULL AND link_expires_at > ?
+      sql: `UPDATE voters SET used = ? WHERE election_id = ? AND used IS NULL
+            AND member_id = (SELECT member_id FROM voter_links WHERE election_id = ? AND token_hash = ? AND expires_at > ?)
             AND EXISTS (SELECT 1 FROM codes WHERE election_id = ? AND hash = ? AND state = 'issued' AND style_id = ?)`,
-      params: [nonce, e.row.id, th, at, e.row.id, hash, styleId],
+      params: [nonce, e.row.id, e.row.id, th, at, e.row.id, hash, styleId],
     },
     {
       sql: `UPDATE codes SET state = 'spent', channel = 'online', at = ?, spend_nonce = ?
@@ -187,9 +200,10 @@ pub.post('/e/:id/online/vote', async (c) => {
     },
     { sql: 'UPDATE codes SET spend_nonce = NULL WHERE election_id = ? AND spend_nonce = ?', params: [e.row.id, nonce] },
     {
-      sql: "UPDATE voters SET used = 'used', link_token_hash = NULL WHERE election_id = ? AND used = ?",
-      params: [e.row.id, nonce],
+      sql: 'DELETE FROM voter_links WHERE election_id = ? AND member_id = (SELECT member_id FROM voters WHERE election_id = ? AND used = ?)',
+      params: [e.row.id, e.row.id, nonce],
     },
+    { sql: "UPDATE voters SET used = 'used' WHERE election_id = ? AND used = ?", params: [e.row.id, nonce] },
   ]);
   if (res[2]!.changes === 1) return c.json({ ok: true, message: 'Your vote is locked and stored. Thank you for voting.' });
   // Nothing was stored. Log why, for the tellers, without spending anything.

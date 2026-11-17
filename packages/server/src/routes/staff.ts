@@ -22,6 +22,7 @@ import { getElection, lockedVotes, log, logStmt, requireStatus, SqlSpendStore } 
 import type { Stmt } from '../db/types.ts';
 
 export const staff = new Hono<Env>();
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const issuer = requireRole('issuer');
 const teller = requireRole('teller');
 const anyStaff = requireRole('issuer', 'teller');
@@ -83,7 +84,10 @@ staff.post('/e/:id/roll', issuer, async (c) => {
   requireStatus(e, 'setup');
   const b = await body<{ members?: { memberId: string; email: string | null }[]; rollSha256?: string; frozenAt?: string }>(c);
   const members = b.members ?? [];
-  const stmts: Stmt[] = [{ sql: 'DELETE FROM voters WHERE election_id = ?', params: [e.row.id] }];
+  const stmts: Stmt[] = [
+    { sql: 'DELETE FROM voter_links WHERE election_id = ?', params: [e.row.id] },
+    { sql: 'DELETE FROM voters WHERE election_id = ?', params: [e.row.id] },
+  ];
   let withEmail = 0;
   for (const m of members) {
     str(m.memberId, 'member ID', /^[^|\s]{1,100}$/);
@@ -122,10 +126,12 @@ staff.post('/e/:id/roll/changes', issuer, async (c) => {
       if (ch.newEmail) {
         await db.run(
           `INSERT INTO voters (election_id, member_id, email) VALUES (?, ?, ?)
-           ON CONFLICT (election_id, member_id) DO UPDATE SET email = excluded.email, link_token_hash = NULL`,
+           ON CONFLICT (election_id, member_id) DO UPDATE SET email = excluded.email`,
           [e.row.id, memberId, ch.newEmail.toLowerCase()],
         );
       } else await db.run('DELETE FROM voters WHERE election_id = ? AND member_id = ? AND used IS NULL', [e.row.id, memberId]);
+      // links already sent to the old address stop working
+      await db.run('DELETE FROM voter_links WHERE election_id = ? AND member_id = ?', [e.row.id, memberId]);
       if (ch.oldEmail) {
         await mailer.send({
           to: ch.oldEmail,
@@ -279,6 +285,7 @@ staff.post('/e/:id/close', issuer, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'open');
+  if (now() < new Date(e.rules.dates.voting_closes)) fail(409, 'Voting can only be closed after the closing time in the rules file.');
   const b = await body<{ statement?: CloseStatement; signature?: string }>(c);
   if (!b.statement || b.statement.electionId !== e.row.id || b.statement.fallback) fail(400, 'Not a close statement for this election.');
   if (Math.abs(Date.parse(b.statement.closedAt) - now().getTime()) > 15 * 60_000) fail(400, 'The close time must be within 15 minutes of now.');
@@ -303,15 +310,24 @@ staff.post('/e/:id/close/fallback', teller, async (c) => {
   const { db, now } = deps(c);
   const e = await getElection(db, c.req.param('id'));
   requireStatus(e, 'open');
+  if (now() < new Date(e.rules.dates.voting_closes)) fail(409, 'Voting can only be closed after the closing time in the rules file.');
   const me = c.get('staff')!;
+  // Only tellers who were already staff when voting opened count, so nobody can invite helpers to force a close.
+  const opened = (await db.first<{ at: string }>("SELECT at FROM public_log WHERE election_id = ? AND kind = 'opened'", [e.row.id]))!.at;
+  const eligible = (await db.all<{ id: string; roles: string }>('SELECT id, roles FROM staff WHERE created_at < ?', [opened])).filter((s) =>
+    s.roles.split(',').includes('teller'),
+  );
+  if (!eligible.some((s) => s.id === me.id)) fail(403, 'Only tellers who were already staff when voting opened can approve a fallback close.');
   await db.run('INSERT OR IGNORE INTO fallback_close_approvals (election_id, staff_id, at) VALUES (?, ?, ?)', [
     e.row.id,
     me.id,
     now().toISOString(),
   ]);
-  const tellers = (await db.all<{ roles: string }>('SELECT roles FROM staff')).filter((s) => s.roles.split(',').includes('teller')).length;
-  const need = Math.min(2, tellers);
-  const have = (await db.first<{ n: number }>('SELECT COUNT(*) AS n FROM fallback_close_approvals WHERE election_id = ?', [e.row.id]))!.n;
+  const need = Math.min(2, eligible.length);
+  const ids = new Set(eligible.map((s) => s.id));
+  const have = (await db.all<{ staff_id: string }>('SELECT staff_id FROM fallback_close_approvals WHERE election_id = ?', [e.row.id])).filter((a) =>
+    ids.has(a.staff_id),
+  ).length;
   if (have < need) {
     await log(db, e.row.id, now(), 'fallback_close_requested', { approvals: have, needed: need });
     return c.json({ closed: false, approvals: have, needed: need });
@@ -379,7 +395,9 @@ staff.put('/e/:id/images/:sha', teller, async (c) => {
   const data = new Uint8Array(await c.req.arrayBuffer());
   if (data.length > 15 * 1024 * 1024) fail(400, 'Image too large.');
   if (sha256Hex(data) !== sha) fail(400, 'The image doesn’t match its fingerprint.');
-  await blobs.put(`${e.row.id}/images/${sha}`, data, c.req.header('content-type') ?? 'image/jpeg');
+  const type = (c.req.header('content-type') ?? '').split(';')[0]!.trim();
+  if (!IMAGE_TYPES.includes(type)) fail(400, 'Images must be JPEG, PNG or WebP.');
+  await blobs.put(`${e.row.id}/images/${sha}`, data, type);
   return c.json({ ok: true });
 });
 
@@ -397,7 +415,14 @@ staff.get('/e/:id/images/:sha', teller, async (c) => {
   const e = await getElection(db, c.req.param('id'));
   const o = await blobs.get(`${e.row.id}/images/${str(c.req.param('sha'), 'image hash', HEX64)}`);
   if (!o) fail(404, 'No such image.');
-  return new Response(o.data as Uint8Array<ArrayBuffer>, { headers: { 'content-type': o.contentType, 'cache-control': 'private, no-store' } });
+  return new Response(o.data as Uint8Array<ArrayBuffer>, {
+    headers: {
+      'content-type': IMAGE_TYPES.includes(o.contentType) ? o.contentType : 'application/octet-stream',
+      'x-content-type-options': 'nosniff',
+      'content-security-policy': "sandbox; default-src 'none'",
+      'cache-control': 'private, no-store',
+    },
+  });
 });
 
 /** A teller rules on an unclear ballot: the cast vote record to count, or rejected. */

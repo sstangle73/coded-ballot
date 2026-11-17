@@ -24,11 +24,12 @@ let out = '';
 let cookie = '';
 let keys: IssuerKeys;
 
+const closesAt = new Date(Date.now() + 25_000).toISOString().replace(/\.\d+Z$/, 'Z');
 function rules() {
   const iso = (h: number) => new Date(Date.now() + h * 3600_000).toISOString().replace(/\.\d+Z$/, 'Z');
   return `schema_version: 1
 election: { id: ${E}, title: Worker test, organisation: Test club }
-dates: { notice: ${iso(-48)}, ballots_out: ${iso(-47)}, voting_opens: ${iso(-1)}, voting_closes: ${iso(1)} }
+dates: { notice: ${iso(-48)}, ballots_out: ${iso(-47)}, voting_opens: ${iso(-1)}, voting_closes: ${closesAt} }
 roles: { mode: one_person }
 classes: [{ id: full, label: Full }]
 contests:
@@ -128,6 +129,8 @@ describe('Workers target (wrangler dev, D1, R2)', () => {
   });
 
   it('closes with the issuer signature and releases the locked votes', async () => {
+    expect((await call('POST', `/api/staff/e/${E}/close`, {})).status).toBe(409); // before the closing time
+    while (Date.now() < Date.parse(closesAt) + 1000) await new Promise((r) => setTimeout(r, 500));
     const prep = await call('GET', `/api/staff/e/${E}/close/prepare`);
     const st = { type: 'coded-ballot/close', version: 1, electionId: E, closedAt: new Date().toISOString(), lockedVotes: prep.json, fallback: false } as const;
     const signed = await signClose(keys, st);

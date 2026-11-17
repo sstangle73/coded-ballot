@@ -53,15 +53,23 @@ CREATE TABLE voters (
   election_id TEXT NOT NULL,
   member_id TEXT NOT NULL,
   email TEXT NOT NULL,
-  link_token_hash TEXT,
-  link_expires_at TEXT,
-  link_requests INTEGER NOT NULL DEFAULT 0,
+  -- link requests in the current hour, to stop the address being flooded
+  link_window_start TEXT,
+  link_window_count INTEGER NOT NULL DEFAULT 0,
   -- 'used' once the member has voted online; a nonce only inside the voting transaction
   used TEXT,
   PRIMARY KEY (election_id, member_id)
 ) WITHOUT ROWID;
 CREATE INDEX voters_email ON voters (election_id, email);
-CREATE UNIQUE INDEX voters_token ON voters (link_token_hash);
+
+-- Every link stays valid until it expires or the member votes; asking again never cancels an earlier one.
+CREATE TABLE voter_links (
+  token_hash TEXT PRIMARY KEY,
+  election_id TEXT NOT NULL,
+  member_id TEXT NOT NULL,
+  expires_at TEXT NOT NULL
+);
+CREATE INDEX voter_links_member ON voter_links (election_id, member_id);
 
 CREATE TABLE locked_votes (
   election_id TEXT NOT NULL,

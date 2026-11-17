@@ -4,7 +4,7 @@
 import type { Deps } from './context.ts';
 import { logStmt } from './store.ts';
 
-const TABLES = ['codes', 'voters', 'locked_votes', 'paper_records', 'hand_counts', 'rejected_uses', 'roll_changes', 'fallback_close_approvals', 'tamper_checks'];
+const TABLES = ['codes', 'voters', 'voter_links', 'locked_votes', 'paper_records', 'hand_counts', 'rejected_uses', 'roll_changes', 'fallback_close_approvals', 'tamper_checks'];
 
 export async function purgeDue(d: Deps): Promise<string[]> {
   const now = d.now();
