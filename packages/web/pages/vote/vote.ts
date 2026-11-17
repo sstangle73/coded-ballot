@@ -1,6 +1,6 @@
 // The online voting page. It runs from the organisation's server or from the project's own copy; the election link
 // carries the server address, election ID and one-time token after the #, which browsers never send to a server.
-import { codeHash, fromBase64, parseTypedCode, sealVote, sealedBody, TLOCK_PREFIX, type BallotStyle, type Contest } from '@coded-ballot/core';
+import { codeHash, fingerprint, fromBase64, parseTypedCode, sealVote, sealedBody, TLOCK_PREFIX, type BallotStyle, type Contest } from '@coded-ballot/core';
 import { Api, serverFromFragment } from '../shared/api.ts';
 import { $, fragmentParams, fragmentWithout, h, restartOnNewFragment, show, status } from '../shared/ui.ts';
 
@@ -20,6 +20,9 @@ const app = $('#app');
 const params = fragmentParams();
 let api: Api;
 let info: Info;
+/** The key votes are sealed to, decoded once. Its fingerprint is worked out here, never taken from the server. */
+let countKeyPublic: Uint8Array;
+let countKeyFingerprint: string;
 const token = params.get('t');
 const electionId = params.get('e');
 
@@ -45,6 +48,14 @@ async function start() {
   if (!info.channels.online) return fail('This election has no online voting. Vote by post or in person.');
   if (info.status !== 'open') return fail(info.status === 'setup' ? 'Voting has not opened yet.' : 'Voting has closed.');
   if (!info.countKey) return fail('The tellers have not set up the count key, so online votes cannot be locked yet.');
+  try {
+    countKeyPublic = fromBase64(info.countKey.publicKey);
+  } catch {
+    return fail('The server sent a count key this page can’t read. Don’t vote online: tell the tellers.');
+  }
+  if (countKeyPublic.length !== 32) return fail('The server sent a count key of the wrong length. Don’t vote online: tell the tellers.');
+  countKeyFingerprint = fingerprint(countKeyPublic);
+  if (countKeyFingerprint !== info.countKey.fingerprint) return fail('The server’s count key and its fingerprint don’t agree. Don’t vote online: tell the tellers.');
   if (!token) return askForLink();
   checkFingerprint();
 }
@@ -75,7 +86,7 @@ function askForLink() {
 
 /** The count key check. On the project's own copy the voter must type the fingerprint from their ballot. */
 function checkFingerprint() {
-  const fp = info.countKey!.fingerprint;
+  const fp = countKeyFingerprint; // from the key itself, so the server can't show one fingerprint and lock with another key
   const projectCopy = api.base !== location.origin;
   const input = h('input', { type: 'text', id: 'fp', class: 'code', autocomplete: 'off', spellcheck: 'false', 'aria-describedby': 'fp-help' });
   const msg = h('div', {});
@@ -235,7 +246,7 @@ function confirm(hash: string, style: BallotStyle, contests: Contest[], selectio
     send.disabled = true;
     try {
       msg.replaceChildren(status('info', 'Locking your vote in this browser…'));
-      const sealed = await sealVote({ v: 1, styleId: style.id, selections }, fromBase64(info.countKey!.publicKey));
+      const sealed = await sealVote({ v: 1, styleId: style.id, selections }, countKeyPublic);
       let body = sealedBody(sealed);
       if (info.timeLock) {
         const { closeRound, tlockEncrypt } = await import('../shared/tlock.ts');

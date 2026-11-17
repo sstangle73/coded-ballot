@@ -13,6 +13,7 @@ import {
   closeStatement,
   deriveIssuerKeys,
   fingerprint,
+  fromBase64,
   generatePassphrase,
   isValidPassphrase,
   loadRules,
@@ -89,12 +90,21 @@ async function keys(electionId: string) {
 }
 
 async function packetInfo(srv: Server, electionId: string): Promise<PacketInfo> {
-  const info = await srv.call<{ countKey: { fingerprint: string } | null }>('GET', `/api/public/e/${electionId}`);
+  const info = await srv.call<{ countKey: { publicKey: string; fingerprint: string } | null }>('GET', `/api/public/e/${electionId}`);
+  let countKeyFingerprint: string | null = null;
   if (!info.countKey) console.warn('Warning: no count key yet, so the fingerprint is not printed. Ask a teller to create it first.');
+  else {
+    // Worked out from the key, then checked with the teller who made it: the server alone can't be trusted to say.
+    countKeyFingerprint = fingerprint(fromBase64(info.countKey.publicKey));
+    if (countKeyFingerprint !== info.countKey.fingerprint) throw new Error('The server’s count key and its fingerprint don’t agree. Stop and tell the tellers.');
+    console.log(`Count key fingerprint: ${countKeyFingerprint}`);
+    const yes = await ask('Has the teller who made the count key read you this fingerprint from their own app, and does it match? (yes/no) ');
+    if (!/^y(es)?$/i.test(yes.trim())) throw new Error('Not printing: check the count key fingerprint with the teller first.');
+  }
   return {
     votingPage: values['voting-page'] ?? `${srv.url}/vote/`,
     tracker: `${srv.url}/public/#e=${electionId}`,
-    countKeyFingerprint: info.countKey?.fingerprint ?? null,
+    countKeyFingerprint,
     returnAddress: (values['return-address'] ?? '').split('|').map((s) => s.trim()).filter(Boolean),
   };
 }
