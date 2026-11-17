@@ -1,6 +1,7 @@
 // After the close: unlock the online votes, read the paper, rule on unclear ballots, enter the hand count, then count
 // and certify. Everything is counted here, on the teller's device; the server only stores what the tellers send.
 import {
+  codeHash,
   countKeyPublicFromPrivate,
   decodeQr,
   describeIssue,
@@ -203,13 +204,22 @@ function paperSection(ctx: Ctx, info: ElectionInfo): HTMLElement {
     log.prepend(h('li', {}, needsRuling.length ? `▲ Ballot ${stored}: stored, needs a ruling (${needsRuling.length} ${needsRuling.length === 1 ? 'issue' : 'issues'})` : `✓ Ballot ${stored}: stored`));
   };
 
+  // Every code received on paper, with its style: loaded once, then each sheet is checked here, on this device.
+  let received: Map<string, string> | null = null;
+  const receivedCodes = async () =>
+    (received ??= new Map((await ctx.api.get<{ codes: { hash: string; styleId: string }[] }>(`/api/staff/e/${info.id}/paper-codes`)).codes.map((c) => [c.hash, c.styleId])));
+
   const add = async (pic: Picture) => {
+    const known = await receivedCodes();
     const qr = findQr(pic.rgba);
     if (!qr) throw new Error('No QR code found. Make sure the whole sheet is in the picture, sharp and well lit.');
     const q = decodeQr(qr.text);
     if (!q) throw new Error('That QR code isn’t a coded-ballot ballot.');
     if (q.electionId !== info.id) throw new Error(`That ballot is for a different election (${q.electionId}).`);
     if (done.has(q.code)) throw new Error('This ballot was already read on this device. Set it aside.');
+    const registered = known.get(codeHash(info.id, q.code));
+    if (registered === undefined) throw new Error('This ballot’s code was never received by post or in person (or it voted online). Set it aside: it can’t be counted.');
+    if (registered !== q.styleId) throw new Error('The QR code’s ballot style doesn’t match the one issued with this code. Set it aside and tell the other tellers.');
     const style = describeStyle(rules, q.styleId);
     if (style.provisional && batch.value !== 'provisional') throw new Error('This is a provisional ballot. Count provisional ballots only after the tellers uphold them, in the provisional batch.');
     if (!style.provisional && batch.value === 'provisional') throw new Error('This isn’t a provisional ballot. Switch back to ordinary ballots.');

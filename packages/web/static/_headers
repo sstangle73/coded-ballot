@@ -1,0 +1,10 @@
+# Headers for every page and file of the release. Cloudflare Workers static assets read this file directly; the
+# Docker/Node target reads the same file at start-up. Wildcard CORS lets the member checker on the project's own site
+# download these public files to compare them with the release; they carry no cookies or private data.
+/*
+  Access-Control-Allow-Origin: *
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(self), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; worker-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'

@@ -11,6 +11,8 @@ import { MemoryMailer, type Mailer } from '../mail/types.ts';
 import { SmtpMailer } from '../mail/smtp.ts';
 import { purgeDue } from '../purge.ts';
 import { configFromEnv } from './config.ts';
+import { parseHeadersFile } from '../static-headers.ts';
+import { existsSync } from 'node:fs';
 
 const env = process.env;
 const secret = (name: string) => env[name] ?? (env[`${name}_FILE`] ? readFileSync(env[`${name}_FILE`]!, 'utf8').trim() : undefined);
@@ -34,6 +36,13 @@ const deps = { db, blobs: new DiskBlobs(join(dataDir, 'blobs')), mailer, config,
 const app = createApp(deps);
 const staticDir = env.STATIC_DIR;
 if (staticDir) {
+  const headersFile = join(staticDir, '_headers');
+  const pageHeaders = existsSync(headersFile) ? parseHeadersFile(readFileSync(headersFile, 'utf8')) : {};
+  app.get('/_headers', (c) => c.notFound());
+  app.use('/*', async (c, next) => {
+    await next();
+    if (!c.req.path.startsWith('/api/')) for (const [k, v] of Object.entries(pageHeaders)) c.res.headers.set(k, v);
+  });
   app.use('/*', serveStatic({ root: staticDir }));
   for (const page of ['vote', 'teller', 'public', 'check']) app.get(`/${page}`, (c) => c.redirect(`/${page}/`));
 }

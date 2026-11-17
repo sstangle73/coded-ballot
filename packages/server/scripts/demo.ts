@@ -22,6 +22,7 @@ import { createApp } from '../src/app.ts';
 import { DiskBlobs, SqliteDb } from '../src/db/sqlite.ts';
 import { MemoryMailer } from '../src/mail/types.ts';
 import { SoftAuthenticator } from '../test/soft-authenticator.ts';
+import { parseHeadersFile } from '../src/static-headers.ts';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const ORIGIN = `http://localhost:${PORT}`;
@@ -64,6 +65,11 @@ app.post('/demo/close', async (c) => {
   return c.json({ closed: true, lockedVotes: prep.json.count });
 });
 app.use('/demo/files/*', serveStatic({ root: dir, rewriteRequestPath: (p) => p.replace(/^\/demo\/files/, '') }));
+const pageHeaders = parseHeadersFile(readFileSync(new URL('../../web/dist/_headers', import.meta.url), 'utf8'));
+app.use('/*', async (c, next) => {
+  await next();
+  if (!c.req.path.startsWith('/api/') && !c.req.path.startsWith('/demo/')) for (const [k, v] of Object.entries(pageHeaders)) c.res.headers.set(k, v);
+});
 app.use('/*', serveStatic({ root: fileURLToPath(new URL('../../web/dist', import.meta.url)) }));
 const call = async (method: string, path: string, body?: unknown, cookie?: string) => {
   const headers: Record<string, string> = { 'content-type': 'application/json', origin: ORIGIN };

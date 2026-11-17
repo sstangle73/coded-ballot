@@ -372,6 +372,23 @@ staff.get('/e/:id/locked-votes', teller, async (c) => {
   });
 });
 
+/**
+ * Every code received on paper (by post or in person) with its ballot style, fetched once by the tellers' app before
+ * reading the paper. Each sheet's code and style are checked against this list on the teller's device, so a sheet
+ * that was never received, voted online, or carries the wrong style can't be counted, and the server never sees
+ * which code a cast vote record came from.
+ */
+staff.get('/e/:id/paper-codes', teller, async (c) => {
+  const { db } = deps(c);
+  const e = await getElection(db, c.req.param('id'));
+  requireStatus(e, 'closed');
+  const rows = await db.all<{ hash: string; style_id: string }>(
+    "SELECT hash, style_id FROM codes WHERE election_id = ? AND state = 'spent' AND channel IN ('mail', 'in_person') ORDER BY hash",
+    [e.row.id],
+  );
+  return c.json({ codes: rows.map((r) => ({ hash: r.hash, styleId: r.style_id })) });
+});
+
 /** Paper read at the count: cast vote records (no codes) and the image fingerprints. */
 staff.post('/e/:id/paper', teller, async (c) => {
   const { db } = deps(c);

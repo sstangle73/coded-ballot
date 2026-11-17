@@ -260,6 +260,13 @@ describe('a whole election', () => {
     void s;
   });
 
+  it('lists the codes received on paper, with styles, for checking sheets at the count', async () => {
+    const r = await call('GET', `/api/staff/e/${E}/paper-codes`, { cookie: tellerCookie });
+    expect(r.json.codes).toContainEqual({ hash: hash('M007'), styleId: 'full' }); // received by post
+    expect(r.json.codes.map((c: { hash: string }) => c.hash)).not.toContain(hash('M001')); // voted online
+    expect((await call('GET', `/api/staff/e/${E}/paper-codes`)).status).toBe(401);
+  });
+
   it('gives tellers the electorate by style for the count, and when the key was destroyed', async () => {
     const r = await call('GET', `/api/staff/e/${E}/report-data`, { cookie: tellerCookie });
     expect(r.json.styles).toEqual([{ styleId: 'full', n: 8 }]); // M008's first code was replaced, so 8, not 9
