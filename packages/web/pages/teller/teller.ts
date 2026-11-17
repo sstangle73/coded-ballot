@@ -226,8 +226,7 @@ function toolToken(): HTMLElement {
         onclick: async () => {
           try {
             const r = await api.post<{ token: string }>('/api/auth/tokens', { label: 'issuer tool' });
-            const file = new Blob([`${r.token}
-`], { type: 'text/plain' });
+            const file = new Blob([`${r.token}\n`], { type: 'text/plain' });
             out.replaceChildren(
               status('warn', 'Save it now: it isn’t shown again. Anyone with it can act as the issuer tool until it expires.'),
               h('p', {}, h('a', { href: URL.createObjectURL(file), download: 'coded-ballot-token.txt', class: 'button' }, 'Save coded-ballot-token.txt')),

@@ -148,9 +148,7 @@ staff.post('/e/:id/roll/changes', issuerTool, async (c) => {
           subject: `${e.rules.election.organisation}: your email for ${e.rules.election.title} was changed`,
           text:
             `The email address the ${e.rules.election.organisation} tellers will use for your online voting link in ` +
-            `"${e.rules.election.title}" was changed from this address.
-
-If you did not ask for this, tell the tellers at once.`,
+            `"${e.rules.election.title}" was changed from this address.\n\nIf you did not ask for this, tell the tellers at once.`,
         });
       }
     }
