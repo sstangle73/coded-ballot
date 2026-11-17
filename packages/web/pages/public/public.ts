@@ -1,6 +1,6 @@
 // The public page: the ballot tracker, counts by channel, and after certification the results, the teller report and
 // everything needed to recount the online votes.
-import { codeHash, parseTypedCode } from '@coded-ballot/core';
+import { codeHash, countKeyPublicFromPrivate, fromBase64, paperTotals, parseTypedCode, toBase64, unlockVote, verifyClose, type CastVoteRecord, type Rules } from '@coded-ballot/core';
 import { Api, serverFromFragment } from '../shared/api.ts';
 import { $, fragmentParams, h, restartOnNewFragment, show, status } from '../shared/ui.ts';
 
@@ -48,13 +48,13 @@ async function start() {
     info.countKey ? h('p', {}, 'Count key fingerprint: ', h('span', { class: 'fingerprint', style: 'font-size:1.1rem' }, info.countKey.fingerprint)) : null,
     h('p', { class: 'small' }, `Rules file SHA-256: ${info.rulesSha256}`),
   ].filter(Boolean) as (Node | string)[];
-  if (info.status === 'certified' || info.status === 'purged') parts.push(...(await results()));
+  if (info.status === 'certified' || info.status === 'purged') parts.push(...(await results(info)));
   else parts.push(status('info', `Results are published when the tellers certify them. The election is ${info.status}.`));
   parts.push(...(await logTable()));
   show(app, ...parts);
 }
 
-async function results(): Promise<Node[]> {
+async function results(info: { rules: Rules; countKey: { publicKey: string } | null }): Promise<Node[]> {
   const r = await api.get(`/api/public/e/${id}/results`);
   const out: Node[] = [h('h2', {}, 'Results')];
   if (r.close?.fallback) out.push(status('warn', 'This election was closed by the tellers’ fallback close, not the issuer’s signed close.'));
@@ -74,8 +74,59 @@ async function results(): Promise<Node[]> {
   }
   const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
   out.push(h('p', {}, h('a', { href: URL.createObjectURL(blob), download: `${id}-recount.json` }, 'Download everything needed to recount the online votes'), ' (the locked votes, the signed close and the published count key).'));
+  if (r.lockedVotes && r.countKeyPrivate) {
+    const box = h('div', { 'aria-live': 'polite' });
+    out.push(h('p', {}, h('button', { class: 'secondary', onclick: () => recount(r, info, box) }, 'Recount the online votes in this browser')), box);
+  }
   if (r.report) out.push(h('details', {}, h('summary', {}, 'Teller report'), h('pre', { style: 'white-space:pre-wrap' }, JSON.stringify(r.report, null, 2))));
   return out;
+}
+
+/**
+ * Anyone's recount of the online votes: check the close covers exactly these locked votes, check the published count
+ * key is the one the votes were locked with, open every vote, and total the choices. Paper ballots aren't published,
+ * so this checks the online part; the teller report says how many of each there were.
+ */
+async function recount(r: any, info: { rules: Rules; countKey: { publicKey: string } | null }, box: HTMLElement) {
+  try {
+    show(box, status('info', 'Recounting…'));
+    const check = await verifyClose(r.close, fromBase64(r.issuerPublicKey), r.lockedVotes);
+    if (!check.ok) return show(box, status('bad', `The close doesn’t match: ${check.reason}.`));
+    const priv = fromBase64(r.countKeyPrivate);
+    const pub = countKeyPublicFromPrivate(priv);
+    if (!info.countKey || toBase64(pub) !== info.countKey.publicKey) return show(box, status('bad', 'The published count key isn’t the one the votes were locked with.'));
+    const tlock = (r.lockedVotes as string[]).some((v) => v.includes(':tlock1:')) ? (await import('../shared/tlock.ts')).tlockDecrypt : undefined;
+    const votes: CastVoteRecord[] = [];
+    let failed = 0;
+    for (const v of r.lockedVotes as string[]) {
+      try {
+        votes.push(await unlockVote(v, { publicKey: pub, privateKey: priv }, tlock));
+      } catch {
+        failed++;
+      }
+    }
+    const totals = paperTotals(info.rules, votes); // the same mark totals, for the online votes
+    const reported = r.report?.ballots?.online;
+    show(
+      box,
+      status(check.fallback ? 'warn' : 'ok', `${check.fallback ? 'Fallback close (no issuer signature). ' : 'The issuer’s signed close covers exactly these votes. '}${votes.length} online ${votes.length === 1 ? 'vote' : 'votes'} opened${failed ? `, ${failed} couldn’t be` : ''}.`),
+      reported !== undefined ? status(reported === votes.length ? 'ok' : 'bad', reported === votes.length ? `That matches the teller report (${reported} online).` : `The teller report says ${reported} online.`) : null,
+      h(
+        'table',
+        {},
+        h('thead', {}, h('tr', {}, h('th', {}, 'Contest'), h('th', {}, 'Online votes (first choices for ranked contests)'))),
+        h(
+          'tbody',
+          {},
+          ...info.rules.contests.map((c) =>
+            h('tr', {}, h('td', {}, c.title), h('td', {}, Object.entries(totals[c.id] ?? {}).map(([k, n]) => `${'candidates' in c ? (c.candidates.find((x) => x.id === k)?.name ?? k) : k[0]!.toUpperCase() + k.slice(1)}: ${n}`).join(', ') || 'none')),
+          ),
+        ),
+      ),
+    );
+  } catch (e) {
+    show(box, status('bad', (e as Error).message));
+  }
 }
 
 async function logTable(): Promise<Node[]> {
