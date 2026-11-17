@@ -130,7 +130,17 @@ The pages aim for WCAG 2.1 AA and pass axe-core's checks for it in light and dar
 signal: every status pairs its colour with a glyph and a word (✓ OK, ▲ Check, ✗ Problem), and the palette is chosen
 to stay distinct for colour-blind readers. Ballots come in a large-print style.
 
+## Security
+
+Found a problem? Please report it privately: see [SECURITY.md](SECURITY.md).
+
 ## Licence
 
 [AGPL-3.0-only](LICENSE). If you change coded-ballot and let people use it over a network, you must offer them your
 changed source.
+
+## Support
+
+This is free and staying that way. If it's useful to you, you can [buy me a coffee](https://buymeacoffee.com/stevenstorie).
+
+Built by [Steven Storie](https://gitlab.com/sstangle73).

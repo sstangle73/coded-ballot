@@ -1,6 +1,7 @@
-# Tests both deployment targets: Node + SQLite, and Workers + D1 + R2 (under wrangler dev, locally).
+# Tests both deployment targets: Node + SQLite, and Workers + D1 + R2 (under wrangler dev, locally). ECR Public's copy
+# of the Docker Official image, outside Docker Hub's anonymous pull limit.
 default:
-  image: node:24-bookworm
+  image: public.ecr.aws/docker/library/node:24-bookworm
 
 stages: [test]
 
