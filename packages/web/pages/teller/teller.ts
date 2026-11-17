@@ -81,6 +81,43 @@ function signIn() {
       'Sign in with my passkey',
     ),
     msg,
+    setUpServer(),
+  );
+}
+
+/** The very first person on a new server: the setup token from the server's settings makes them issuer and teller. */
+function setUpServer(): HTMLElement {
+  const token = h('input', { id: 'su-token', type: 'password', autocomplete: 'off' });
+  const name = h('input', { id: 'su-name', type: 'text', autocomplete: 'name' });
+  const email = h('input', { id: 'su-email', type: 'email', autocomplete: 'email' });
+  const msg = h('div', {});
+  return h(
+    'details',
+    {},
+    h('summary', {}, 'First time on this server? Set it up'),
+    h(
+      'form',
+      {
+        onsubmit: async (e: Event) => {
+          e.preventDefault();
+          try {
+            const r = await api.post<{ invite: string }>('/api/auth/bootstrap', { setupToken: token.value, name: name.value, email: email.value });
+            enrol(r.invite);
+          } catch (err) {
+            msg.replaceChildren(status('bad', (err as Error).message));
+          }
+        },
+      },
+      h('p', { class: 'small' }, 'Only the first person needs this: the setup token is in the server’s settings. You become the issuer and a teller, then invite everyone else.'),
+      h('label', { for: 'su-token' }, 'Setup token'),
+      token,
+      h('label', { for: 'su-name' }, 'Your name'),
+      name,
+      h('label', { for: 'su-email' }, 'Your email address'),
+      email,
+      h('button', { type: 'submit' }, 'Set up and make my passkey'),
+      msg,
+    ),
   );
 }
 
@@ -147,6 +184,7 @@ async function home(staff: Staff) {
           ),
         )
       : h('p', {}, staff.roles.includes('issuer') ? 'No elections yet. Create one with the issuer tool: coded-ballot check-rules, then upload.' : 'No elections yet.'),
+    staff.roles.includes('issuer') ? toolToken() : null,
     inviteForm(ctx),
   );
   const id = fragmentParams().get('e');
@@ -170,6 +208,39 @@ function signedInBar(ctx: Ctx) {
       },
       'Sign out',
     ),
+  );
+}
+
+/** A 12-hour token for the issuer tool on the issuer's own computer. Shown once; signing out ends it. */
+function toolToken(): HTMLElement {
+  const out = h('div', {});
+  return h(
+    'details',
+    {},
+    h('summary', {}, 'Make a token for the issuer tool'),
+    h('p', { class: 'small' }, 'The issuer tool on your own computer uses it to upload the roll and code hashes and to sign the close. It lasts 12 hours, and signing out here ends it.'),
+    h(
+      'button',
+      {
+        class: 'secondary',
+        onclick: async () => {
+          try {
+            const r = await api.post<{ token: string }>('/api/auth/tokens', { label: 'issuer tool' });
+            const file = new Blob([`${r.token}
+`], { type: 'text/plain' });
+            out.replaceChildren(
+              status('warn', 'Save it now: it isn’t shown again. Anyone with it can act as the issuer tool until it expires.'),
+              h('p', {}, h('a', { href: URL.createObjectURL(file), download: 'coded-ballot-token.txt', class: 'button' }, 'Save coded-ballot-token.txt')),
+              h('p', { class: 'small' }, 'Then run the issuer tool with --token-file coded-ballot-token.txt --server ', location.origin),
+            );
+          } catch (e) {
+            out.replaceChildren(status('bad', (e as Error).message));
+          }
+        },
+      },
+      'Make a token',
+    ),
+    out,
   );
 }
 

@@ -195,4 +195,10 @@ Still open:
 - **Project site:** the project-hosted voting page and member checker are published on GitHub Pages from the GitHub mirror, built by CI from tagged source with the SHA-256 of every file alongside. Nothing is published until the maintainer decides to.
 - **Sign-in for tellers and the issuer:** passkeys (WebAuthn) on both targets, enrolled by a one-time email link. Cloudflare Access can sit in front as an extra layer.
 - **Email:** any SMTP server on Docker; on Workers, a provider's HTTPS API. Tested with Amazon SES.
-- **Mail API:** Lob first, tested in Lob's test mode; PostGrid as a second adapter.
+- **Mail API:** Lob first, for Lob's test mode; a PostGrid adapter can follow.
+- **Count key fingerprint:** the voting page and the issuer tool work it out from the public key itself, never from the fingerprint the server reports, and the issuer confirms it with the teller who made the key before printing ballots.
+- **Mark reading:** in TypeScript in the core, without OpenCV: four corner squares, a perspective map, and each oval judged against the paper just around it. A mark must be dark across the whole oval (70% overall and 45% in every quarter); crosses, ticks, write-ins, overvotes and rank-grid mistakes always go to a teller. Real-paper tests: [docs/scanning-tests.md](docs/scanning-tests.md).
+- **Which paper counts:** before reading paper, the tellers' app downloads every code received by post or in person with its ballot style, once, and checks each sheet against that list on the teller's device. A sheet never received, voted online, or carrying the wrong style can't be counted, and the server never learns which code a cast vote record came from.
+- **Ballot images** are re-saved as JPEG in the tellers' app before upload, which drops photo metadata such as location.
+- **Recount:** the public page recounts the online votes in the member's browser after certification. Paper cast vote records are not published.
+- **Page headers:** the release carries a `_headers` file (strict CSP, no framing, wildcard CORS on the public files for the member checker). Cloudflare reads it; the Node target applies the same file.
