@@ -9,12 +9,11 @@ import {
   verifyRegistrationResponse,
 } from '@simplewebauthn/server';
 import { fromBase64, toBase64, utf8ToBytes } from '@coded-ballot/core';
-import { body, deps, fail, randomToken, str, tokenHash, type C, type Env, type Role, type Staff } from '../context.ts';
+import { EMAIL, body, deps, fail, randomToken, str, tokenHash, type C, type Env, type Role, type Staff } from '../context.ts';
 
 const SESSION_COOKIE = 'cb_session';
 const SESSION_HOURS = 12;
 const INVITE_DAYS = 7;
-const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface StaffRow {
   id: string;

@@ -169,6 +169,18 @@ describe('a whole election', () => {
     expect((await call('GET', `/api/public/e/${E}/track/${hash('M008')}`)).json).toEqual({ status: 'replaced' });
   });
 
+  it('tells the address on file when a member’s email changes, whatever the caller says it was', async () => {
+    const before = mailer.sent.length;
+    const r = await call('POST', `/api/staff/e/${E}/roll/changes`, {
+      cookie: issuerCookie,
+      body: { changes: [{ memberId: 'M006', kind: 'email_changed', oldEmail: 'nobody@elsewhere.test', newEmail: 'M006.new@example.org' }] },
+    });
+    expect(r.status).toBe(200);
+    const sent = mailer.sent.slice(before);
+    expect(sent.map((m) => m.to)).toEqual(['m006@example.org']);
+    expect((await call('POST', `/api/staff/e/${E}/roll/changes`, { cookie: issuerCookie, body: { changes: [{ memberId: 'M006', kind: 'email_changed', newEmail: 'not an email' }] } })).status).toBe(400);
+  });
+
   it('spends mailed codes once; a photocopy is turned away', async () => {
     const first = await call('POST', `/api/staff/e/${E}/receipts`, { cookie: tellerCookie, body: { hash: hash('M007'), styleId: 'full', channel: 'mail' } });
     expect(first.json).toEqual({ ok: true, styleId: 'full' });

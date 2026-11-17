@@ -74,5 +74,6 @@ export function str(v: unknown, name: string, re?: RegExp, max = 2000): string {
 }
 
 export const HEX64 = /^[0-9a-f]{64}$/;
+export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export const STYLE = /^[a-z0-9][a-z0-9-]{0,39}(?:_w\d+(?:\.\d{1,4})?)?(?:_lp)?(?:_prov)?$/;
 export const ELECTION = /^[a-z0-9][a-z0-9-]{0,39}$/;

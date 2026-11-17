@@ -16,7 +16,7 @@ import {
   type Channel,
   type CloseStatement,
 } from '@coded-ballot/core';
-import { body, deps, ELECTION, fail, HEX64, str, STYLE, type C, type Env } from '../context.ts';
+import { body, deps, ELECTION, EMAIL, fail, HEX64, str, STYLE, type C, type Env } from '../context.ts';
 import { issuerTool, requireRole } from './auth.ts';
 import { getElection, lockedVotes, log, logStmt, requireStatus, SqlSpendStore } from '../store.ts';
 import type { Stmt } from '../db/types.ts';
@@ -115,32 +115,42 @@ staff.post('/e/:id/roll/changes', issuerTool, async (c) => {
   const b = await body<{ changes?: { memberId: string; kind: string; oldEmail?: string | null; newEmail?: string | null }[] }>(c);
   for (const ch of b.changes ?? []) {
     const memberId = str(ch.memberId, 'member ID', /^[^|\s]{1,100}$/);
+    const kind = str(ch.kind, 'kind', /^[a-z_]{1,30}$/);
+    // the old address is the one the server holds, never one the caller supplies
+    const prev = await db.first<{ email: string | null; used: string | null }>('SELECT email, used FROM voters WHERE election_id = ? AND member_id = ?', [
+      e.row.id,
+      memberId,
+    ]);
+    const newEmail = ch.newEmail ? str(ch.newEmail, 'new email', EMAIL, 200).toLowerCase() : null;
+    if (kind === 'email_changed' && prev?.used) fail(409, `${memberId} has already voted online; their email can't change now.`);
     await db.run('INSERT INTO roll_changes (election_id, member_id, kind, detail, at) VALUES (?, ?, ?, ?, ?)', [
       e.row.id,
       memberId,
-      str(ch.kind, 'kind', /^[a-z_]{1,30}$/),
-      JSON.stringify({ oldEmail: ch.oldEmail ?? null, newEmail: ch.newEmail ?? null }),
+      kind,
+      JSON.stringify(kind === 'email_changed' ? { oldEmail: prev?.email ?? null, newEmail } : {}),
       now().toISOString(),
     ]);
-    if (ch.kind === 'email_changed') {
+    if (kind === 'email_changed') {
       // the new address and the end of links already sent to the old one happen together
       await db.batch([
-        ch.newEmail
+        newEmail
           ? {
               sql: `INSERT INTO voters (election_id, member_id, email) VALUES (?, ?, ?)
                     ON CONFLICT (election_id, member_id) DO UPDATE SET email = excluded.email`,
-              params: [e.row.id, memberId, ch.newEmail.toLowerCase()],
+              params: [e.row.id, memberId, newEmail],
             }
           : { sql: 'DELETE FROM voters WHERE election_id = ? AND member_id = ? AND used IS NULL', params: [e.row.id, memberId] },
         { sql: 'DELETE FROM voter_links WHERE election_id = ? AND member_id = ?', params: [e.row.id, memberId] },
       ]);
-      if (ch.oldEmail) {
+      if (prev?.email && prev.email !== newEmail) {
         await mailer.send({
-          to: ch.oldEmail,
+          to: prev.email,
           subject: `${e.rules.election.organisation}: your email for ${e.rules.election.title} was changed`,
           text:
             `The email address the ${e.rules.election.organisation} tellers will use for your online voting link in ` +
-            `"${e.rules.election.title}" was changed from this address.\n\nIf you did not ask for this, tell the tellers at once.`,
+            `"${e.rules.election.title}" was changed from this address.
+
+If you did not ask for this, tell the tellers at once.`,
         });
       }
     }
