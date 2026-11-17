@@ -260,6 +260,13 @@ describe('a whole election', () => {
     void s;
   });
 
+  it('gives tellers the electorate by style for the count, and when the key was destroyed', async () => {
+    const r = await call('GET', `/api/staff/e/${E}/report-data`, { cookie: tellerCookie });
+    expect(r.json.styles).toEqual([{ styleId: 'full', n: 8 }]); // M008's first code was replaced, so 8, not 9
+    expect(r.json.closedAt).toBe('2027-03-29T23:05:00.000Z');
+    expect(r.json).toHaveProperty('keyDestroyedAt');
+  });
+
   it('blocks certification until the hand count matches', async () => {
     await call('POST', `/api/staff/e/${E}/paper`, {
       cookie: tellerCookie,

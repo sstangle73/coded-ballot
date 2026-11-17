@@ -1,7 +1,8 @@
 // The opt-in time-lock (tlock-js, drand quicknet). The chain hash and public key are constants in the release, and
 // tlock-js's client checks every beacon against them.
 import { Buffer, defaultChainInfo, mainnetClient, timelockDecrypt, timelockEncrypt } from 'tlock-js';
-import { DRAND_QUICKNET, firstRoundAfter } from '@coded-ballot/core';
+import { fetchBeacon } from 'drand-client';
+import { DRAND_QUICKNET, firstRoundAfter, type DrandRound } from '@coded-ballot/core';
 
 function client() {
   if (defaultChainInfo.hash !== DRAND_QUICKNET.chainHash || defaultChainInfo.public_key !== DRAND_QUICKNET.publicKey) {
@@ -21,4 +22,10 @@ export async function tlockEncrypt(round: number, bytes: Uint8Array): Promise<st
 
 export async function tlockDecrypt(armored: string): Promise<Uint8Array> {
   return new Uint8Array(await timelockDecrypt(armored, client()));
+}
+
+/** A drand round, its BLS signature checked against the pinned quicknet key by drand-client. */
+export async function drandRound(round: number): Promise<DrandRound> {
+  const b = await fetchBeacon(client(), round);
+  return { round: b.round, randomness: b.randomness, signature: b.signature };
 }

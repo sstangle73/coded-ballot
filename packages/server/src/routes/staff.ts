@@ -280,7 +280,8 @@ staff.post('/e/:id/receipts', teller, async (c) => {
   if (channel !== 'mail' && channel !== 'in_person') fail(400, 'channel must be mail or in_person');
   if (!e.rules.channels[channel]) fail(409, `This election doesn't allow ${channel === 'mail' ? 'mail' : 'in-person'} voting.`);
   const list = new SpendList(new SqlSpendStore(db, e.row.id), e.row.id);
-  const r = await list.spend(str(b.hash, 'code hash', HEX64), channel, now(), str(b.styleId, 'style', STYLE));
+  // the style from the QR code must match the code's; a code typed by hand from a damaged sheet has none
+  const r = await list.spend(str(b.hash, 'code hash', HEX64), channel, now(), b.styleId === undefined ? undefined : str(b.styleId, 'style', STYLE));
   return c.json(r);
 });
 
@@ -516,6 +517,12 @@ staff.get('/e/:id/report-data', teller, async (c) => {
     rulesSha256: e.row.rules_sha256,
     counts: await list.counts(),
     rejectedUses: await list.rejectedUses(),
+    // the electorate by ballot style (codes not replaced): for thresholds "of members", quorum and small groups
+    styles: (
+      await db.all<{ style_id: string; n: number }>("SELECT style_id, COUNT(*) AS n FROM codes WHERE election_id = ? AND state != 'revoked' GROUP BY style_id ORDER BY style_id", [id])
+    ).map((r) => ({ styleId: r.style_id, n: r.n })),
+    keyDestroyedAt: (await db.first<{ at: string }>("SELECT at FROM public_log WHERE election_id = ? AND kind = 'issuer_key_destroyed' ORDER BY seq DESC LIMIT 1", [id]))?.at ?? null,
+    closedAt: e.row.close_json ? (JSON.parse(e.row.close_json) as { closedAt: string }).closedAt : null,
     rollChanges: await db.all('SELECT member_id, kind, detail, at FROM roll_changes WHERE election_id = ? ORDER BY at', [id]),
     tamperChecks: await db.all('SELECT at, ok, detail FROM tamper_checks WHERE election_id = ? ORDER BY at', [id]),
     handCounts: await db.all(

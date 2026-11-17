@@ -14,3 +14,5 @@ export * from './count/index.ts';
 export { sodium } from './sodium.ts';
 export * from './layout.ts';
 export * from './vote.ts';
+export * from './scan.ts';
+export * from './tally.ts';

@@ -2,6 +2,7 @@
 // carries the server address, election ID and one-time token after the #, which browsers never send to a server.
 import { codeHash, fingerprint, fromBase64, parseTypedCode, sealVote, sealedBody, TLOCK_PREFIX, type BallotStyle, type Contest } from '@coded-ballot/core';
 import { Api, serverFromFragment } from '../shared/api.ts';
+import { contestFields } from '../shared/ballot-form.ts';
 import { $, fragmentParams, fragmentWithout, h, restartOnNewFragment, show, status } from '../shared/ui.ts';
 
 interface Info {
@@ -153,72 +154,9 @@ function askCode() {
   );
 }
 
-type Getter = () => { ok: true; selection: string[] } | { ok: false; message: string };
-
-function contestFields(c: Contest): { node: HTMLElement; get: Getter } {
-  const name = `c-${c.id}`;
-  const legend = h('legend', {}, c.title);
-  if (c.method === 'yes_no') {
-    const opts = ['yes', 'no', ...(c.allow_abstain ? ['abstain'] : [])];
-    const inputs = opts.map((o) => h('input', { type: 'radio', name, value: o }));
-    const node = h('fieldset', {}, legend, ...opts.map((o, i) => h('label', { class: 'choice' }, inputs[i]!, o[0]!.toUpperCase() + o.slice(1))));
-    return { node, get: () => ({ ok: true, selection: inputs.filter((x) => x.checked).map((x) => x.value) }) };
-  }
-  const cands = c.candidates;
-  if (c.method === 'irv' || c.method === 'stv') {
-    const n = cands.length;
-    const selects = cands.map((cd) => {
-      const s = h('select', { id: `${name}-${cd.id}` }, h('option', { value: '' }, '—'), ...Array.from({ length: n }, (_, i) => h('option', { value: String(i + 1) }, String(i + 1))));
-      return s;
-    });
-    const node = h(
-      'fieldset',
-      {},
-      legend,
-      h('p', { class: 'small' }, `Give 1 to your first choice, 2 to your next, and so on. Rank as many as you like.${c.method === 'stv' ? ` ${c.seats} seats.` : ''}`),
-      ...cands.map((cd, i) => h('div', { class: 'rank-row' }, h('label', { for: `${name}-${cd.id}`, style: 'margin:0;font-weight:400' }, cd.name), selects[i]!)),
-    );
-    return {
-      node,
-      get: () => {
-        const ranks = selects.map((s, i) => ({ id: cands[i]!.id, r: Number(s.value) })).filter((x) => x.r > 0);
-        const used = new Set<number>();
-        for (const x of ranks) {
-          if (used.has(x.r)) return { ok: false, message: `${c.title}: two names have rank ${x.r}. Give each name a different number.` };
-          used.add(x.r);
-        }
-        return { ok: true, selection: ranks.sort((a, b) => a.r - b.r).map((x) => x.id) };
-      },
-    };
-  }
-  const max = c.method === 'plurality' ? c.seats : (c.max_approvals ?? cands.length);
-  const single = max === 1;
-  const inputs = cands.map((cd) => h('input', { type: single ? 'radio' : 'checkbox', name, value: cd.id }));
-  const writeIn = c.write_ins ? h('input', { type: 'text', id: `${name}-wi`, maxlength: '80', autocomplete: 'off' }) : null;
-  const node = h(
-    'fieldset',
-    {},
-    legend,
-    h('p', { class: 'small' }, max === 1 ? 'Choose one.' : c.method === 'approval' && !c.max_approvals ? 'Choose as many as you approve of.' : `Choose up to ${max}.`),
-    ...cands.map((cd, i) => h('label', { class: 'choice' }, inputs[i]!, cd.name)),
-    writeIn && h('label', { for: `${name}-wi` }, 'Write-in (optional)'),
-    writeIn,
-  );
-  return {
-    node,
-    get: () => {
-      const sel = inputs.filter((x) => x.checked).map((x) => x.value);
-      const wi = writeIn?.value.trim();
-      if (wi) sel.push(`write-in:${wi}`);
-      if (sel.length > max) return { ok: false, message: `${c.title}: choose at most ${max}.` };
-      return { ok: true, selection: sel };
-    },
-  };
-}
-
 function ballot(hash: string, style: BallotStyle) {
   const contests = style.contests.map((id) => info.rules.contests.find((c) => c.id === id)!);
-  const fields = contests.map(contestFields);
+  const fields = contests.map((c) => contestFields(c));
   const msg = h('div', {});
   const review = (e: Event) => {
     e.preventDefault();
