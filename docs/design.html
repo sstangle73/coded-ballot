@@ -1,0 +1,830 @@
+<title>Coded Ballot Design</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a single reading column with a sticky level switch; each section carries a plain and a technical telling around one shared diagram. */
+:root {
+  --bg: #f5f7fa;
+  --panel: #ffffff;
+  --fg: #16202e;
+  --muted: #586477;
+  --line: #d3dae4;
+  --accent: #1f5fbf;   /* mail channel, primary links */
+  --warm: #b35400;     /* online channel */
+  --slate: #4a5566;    /* in-person channel */
+  --tint: #e9f0fb;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141b; --panel: #171f2a; --fg: #e5eaf1; --muted: #9ba7b8; --line: #2b3646;
+    --accent: #78a9ff; --warm: #f2a250; --slate: #aab4c3; --tint: #1a2638; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141b; --panel: #171f2a; --fg: #e5eaf1; --muted: #9ba7b8; --line: #2b3646;
+  --accent: #78a9ff; --warm: #f2a250; --slate: #aab4c3; --tint: #1a2638; color-scheme: dark;
+}
+
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6; }
+:root:not([data-level="simple"]) .s { display: none; }
+:root[data-level="simple"] .t { display: none; }
+
+.wrap { max-width: 980px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.prose { max-width: 68ch; }
+
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); }
+.bar .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-block: 10px; }
+.bar .name { font-family: var(--font-display); font-weight: 700; font-size: 15px; letter-spacing: .01em; }
+.switch { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--panel); }
+.switch button { font: 500 14px/1 var(--font-body); color: var(--muted); background: transparent; border: 0; border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+.switch button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.switch button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+header.hero { padding-block: 40px 8px; }
+.eyebrow { font: 600 12px/1.4 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(34px, 6vw, 54px); line-height: 1.05; margin: 10px 0 14px; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: clamp(24px, 3.4vw, 30px); line-height: 1.15; margin: 0 0 12px; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-weight: 500; font-size: 19px; margin: 22px 0 6px; }
+.lede { font-size: 18px; color: var(--fg); max-width: 64ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.meta span { white-space: nowrap; }
+
+section { padding-block: 34px; border-top: 1px solid var(--line); }
+section > .wrap { display: grid; gap: 14px; }
+p { margin: 0 0 10px; }
+ul, ol { margin: 0 0 10px; padding-left: 22px; }
+li { margin-bottom: 4px; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+a { color: var(--accent); }
+.muted { color: var(--muted); }
+.k { font-weight: 600; }
+
+.ch { font-weight: 600; white-space: nowrap; }
+.ch.mail { color: var(--accent); }
+.ch.online { color: var(--warm); }
+.ch.person { color: var(--slate); }
+
+figure { margin: 6px 0 4px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+figure .scroll { overflow-x: auto; }
+figure svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--fg); font-family: var(--font-body); }
+figcaption { font-size: 14px; color: var(--muted); margin-top: 10px; max-width: 75ch; }
+
+.callout { border: 1px dashed var(--warm); border-radius: 8px; padding: 12px 14px; background: var(--panel); max-width: 72ch; }
+.callout .lab { font: 600 12px/1.4 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--warm); display: block; margin-bottom: 4px; }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 620px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font: 600 12px/1.3 var(--font-mono); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); background: var(--tint); }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g { font-family: var(--font-mono); white-space: nowrap; }
+
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.cols > div { min-width: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.cols h3 { margin-top: 0; }
+
+ol.decisions { counter-reset: d; list-style: none; padding: 0; display: grid; gap: 8px; max-width: 78ch; }
+ol.decisions li { counter-increment: d; display: grid; grid-template-columns: 2.2em 1fr; gap: 8px; margin: 0; }
+ol.decisions li::before { content: counter(d); font: 600 13px/1.6 var(--font-mono); color: var(--muted); text-align: right; }
+
+footer { padding-block: 26px 48px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .switch button { transition: background .15s, color .15s; } }
+</style>
+
+<div class="bar">
+  <div class="wrap">
+    <span class="name">Coded Ballot Design</span>
+    <div class="switch" role="group" aria-label="Level of detail">
+      <button type="button" id="lvl-technical" data-level="technical" aria-pressed="true">Technical</button>
+      <button type="button" id="lvl-simple" data-level="simple" aria-pressed="false">Explain it simply</button>
+    </div>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Design discussion · 16 Nov 2026 · nothing built yet</div>
+    <h1>One coded ballot, three ways to vote, one vote counted</h1>
+    <p class="lede t">An open source election system for member organisations run by volunteer tellers. Each member gets one ballot with a unique code. They can mail it, vote online with the code, or bring it to the meeting. The first use of the code counts and every later use is rejected. The secret ballot holds because no name ever appears on the ballot and no one keeps a list of who got which code. Each organisation's own rules live in a rules file, and counting methods are reviewed, pluggable modules. It is sized for clubs and nonprofits, not high-stakes public elections.</p>
+    <p class="lede s">Every member gets one ballot with a secret code on it, but not their name. You can post it back, type the code into a website, or drop the ballot in the box at the meeting. Whichever you do first counts. If anyone tries the same code again, even with a photocopy, it's turned away. Nobody can tell which ballot is yours. It's made for clubs and charities, not for government elections.</p>
+    <div class="meta">
+      <span>✓ = checked against the project's own site or repo on 16 Nov 2026</span>
+      <span><i>(inference)</i> = not checked</span>
+      <span><span class="ch mail">✉ Mail</span> · <span class="ch online">⌨ Online</span> · <span class="ch person">▣ In person</span></span>
+    </div>
+  </div>
+</header>
+
+<!-- 1 · Overview -->
+<section>
+  <div class="wrap">
+    <h2>How a vote travels</h2>
+    <div class="prose t">
+      <p>The issuer's tool runs on the issuer's own machine. It derives every code from a passphrase, sends the printable letters to a mail service or email service, and uploads only <code>hash(S)</code> and the ballot style. All three channels end at the same <span class="k">spend list</span>, where one atomic update moves a code from <code>issued</code> to <code>spent</code>. Online choices are locked in the voter's browser with the tellers' count key, and stored with no code and no timestamp.</p>
+    </div>
+    <div class="prose s">
+      <p>Think of the code as a cinema ticket with no name on it. The organisation prints one ticket per member and posts or emails it. The election website keeps a list of ticket <i>fingerprints</i>: it can tell a real ticket from a fake, but not whose it is. When a ticket is used, by post, online or in person, it gets torn. A torn ticket can't be used again. Your vote goes in a separate pile that has no ticket on it.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 -26 960 452" role="img" aria-label="The issuer's local tool makes codes and sends letters through a mail service or email to the member. The member votes by mail or in person through the tellers, or online directly. All three spend the same code on the server's spend list. Choices are stored apart, and the public page shows status and results.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+          <marker id="a1m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker>
+          <marker id="a1o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--warm)"/></marker>
+          <marker id="a1p" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--slate)"/></marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2">
+          <rect x="20" y="30" width="190" height="170" rx="8" style="fill:var(--panel)"/>
+          <rect x="40" y="88" width="150" height="46" rx="6" stroke-dasharray="4 3" style="fill:var(--tint)"/>
+          <rect x="300" y="30" width="170" height="64" rx="8" style="fill:var(--panel)"/>
+          <rect x="300" y="130" width="170" height="64" rx="8" style="fill:var(--panel)"/>
+          <rect x="540" y="60" width="160" height="110" rx="8" style="fill:var(--panel)"/>
+          <rect x="540" y="250" width="160" height="80" rx="8" style="fill:var(--panel)"/>
+          <rect x="780" y="30" width="165" height="390" rx="8" style="fill:var(--panel)"/>
+          <rect x="795" y="72" width="135" height="98" rx="6" style="fill:var(--tint)"/>
+          <rect x="795" y="230" width="135" height="85" rx="6" style="fill:var(--tint)"/>
+          <rect x="795" y="350" width="135" height="58" rx="6" style="fill:var(--tint)"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13">
+          <text x="115" y="55" font-weight="600">Issuer's computer</text>
+          <text x="115" y="73" font-size="11.5" fill-opacity=".7">local tool, not the server</text>
+          <text x="115" y="108" font-weight="600">passphrase</text>
+          <text x="115" y="125" font-size="11.5" fill-opacity=".7">never uploaded</text>
+          <text x="115" y="160">makes code S</text>
+          <text x="115" y="178" font-size="11.5" fill-opacity=".7">per member</text>
+          <text x="385" y="57" font-weight="600">Mail service API</text>
+          <text x="385" y="76" font-size="11.5" fill-opacity=".7">prints, posts via USPS</text>
+          <text x="385" y="157" font-weight="600">Email service</text>
+          <text x="385" y="176" font-size="11.5" fill-opacity=".7">PDF ballot to print</text>
+          <text x="620" y="88" font-weight="600">Member</text>
+          <text x="620" y="110">ballot sheet</text>
+          <text x="620" y="128" font-size="11.5" fill-opacity=".7">code S + QR</text>
+          <text x="620" y="146" font-size="11.5" fill-opacity=".7">no name on it</text>
+          <text x="620" y="276" font-weight="600">Tellers</text>
+          <text x="620" y="296" font-size="11.5" fill-opacity=".7">scan code on arrival</text>
+          <text x="620" y="314" font-size="11.5" fill-opacity=".7">read marks at count</text>
+          <text x="862" y="54" font-weight="600">Election server</text>
+          <text x="862" y="96" font-weight="600">Spend list</text>
+          <text x="862" y="116" font-size="11.5" class="mono" font-family="var(--font-mono)">hash(S) → state</text>
+          <text x="862" y="136" font-size="11.5" fill-opacity=".7">issued · spent</text>
+          <text x="862" y="154" font-size="11.5" fill-opacity=".7">revoked</text>
+          <text x="862" y="256" font-weight="600">Choices</text>
+          <text x="862" y="276" font-size="11.5" fill-opacity=".7">locked · no code</text>
+          <text x="862" y="294" font-size="11.5" fill-opacity=".7">tellers hold the key</text>
+          <text x="862" y="374" font-weight="600">Public page</text>
+          <text x="862" y="393" font-size="11.5" fill-opacity=".7">tracker · results</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M115,30 V0 H922 V72" stroke-dasharray="5 4" marker-end="url(#a1)"/>
+          <path d="M210,62 H300" marker-end="url(#a1)"/>
+          <path d="M210,162 H300" marker-end="url(#a1)"/>
+          <path d="M470,75 H540" marker-end="url(#a1)"/>
+          <path d="M470,155 H540" marker-end="url(#a1)"/>
+          <path d="M862,170 V230" marker-end="url(#a1)"/>
+          <path d="M862,315 V350" marker-end="url(#a1)"/>
+          <path d="M700,262 H740 V140 H795" marker-end="url(#a1)"/>
+          <path d="M700,300 H795" marker-end="url(#a1)"/>
+        </g>
+        <path d="M700,98 H795" fill="none" stroke-width="2.2" style="stroke:var(--warm)" marker-end="url(#a1o)"/>
+        <path d="M585,170 V250" fill="none" stroke-width="2.2" style="stroke:var(--accent)" marker-end="url(#a1m)"/>
+        <path d="M655,170 V250" fill="none" stroke-width="2.2" stroke-dasharray="6 3" style="stroke:var(--slate)" marker-end="url(#a1p)"/>
+        <g font-size="12" fill="currentColor" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px;stroke-linejoin:round">
+          <text x="520" y="-8" text-anchor="middle">uploads hash(S) + ballot style only · no names</text>
+          <text x="255" y="54" text-anchor="middle">letters</text>
+          <text x="255" y="154" text-anchor="middle">email</text>
+          <text x="505" y="68" text-anchor="middle">post</text>
+          <text x="505" y="148" text-anchor="middle">inbox</text>
+          <text x="747" y="89" text-anchor="middle" font-weight="600" style="fill:var(--warm)">⌨ online</text>
+          <text x="747" y="116" text-anchor="middle" font-size="11">code + email link</text>
+          <text x="578" y="214" text-anchor="end" font-weight="600" style="fill:var(--accent)">✉ mail</text>
+          <text x="662" y="200" font-weight="600" style="fill:var(--slate)">▣ in person</text>
+          <text x="734" y="240" text-anchor="end" font-size="11">spend S</text>
+          <text x="748" y="293" text-anchor="middle" font-size="11">marks</text>
+          <text x="870" y="205" font-size="11">accept once</text>
+          <text x="870" y="336" font-size="11">totals</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">The dashed top line is the only link from the issuer to the server, and it carries fingerprints, never names. All three channel arrows end at the spend list, which is why a code can't be used twice across channels.</figcaption>
+      <figcaption class="s">The issuer's computer makes the tickets and sends them out. The website only ever gets each ticket's fingerprint. Three coloured arrows, three ways to vote, all ending at the same list of torn tickets.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 2 · One code -->
+<section>
+  <div class="wrap">
+    <h2>One code, used once</h2>
+    <div class="prose t">
+      <p>Each code is a credential, and the bearer is the voter. Its life is a small state machine on the server, keyed by <code>hash(S)</code>. Spending it is a compare-and-set (<code>UPDATE … SET state='spent', channel=?, at=? WHERE hash=? AND state='issued'</code>), so two channels racing for the same code can't both win. First use wins. Re-voting or letting an in-person vote override an online one is impossible by design, because the earlier choice can't be found to remove it.</p>
+      <ul>
+        <li><span class="ch mail">✉ Mail</span>: when an envelope arrives, tellers scan the QR code printed on the outside of the folded sheet, without unfolding it. That spends the code and starts the member's tracker. The folded sheet goes unread into a sealed box until the count.</li>
+        <li><span class="ch online">⌨ Online</span>: code plus a one-time link sent to the member's own email (see the second-factor section below).</li>
+        <li><span class="ch person">▣ In person</span>: the sheet is scanned as it goes into the box. If the member forgot their ballot, the issuer reissues it on the spot.</li>
+        <li><span class="k">Copies</span> (photocopies, home-printed PDFs, forwarded emails) carry the same S, so they need no special handling.</li>
+      </ul>
+    </div>
+    <div class="prose s">
+      <p>A ticket can be in only a few states: <b>not used yet</b>, <b>used</b>, or <b>cancelled</b> because the member lost it and got a new one. If someone photocopies a ticket, the copy has the same code. Whichever arrives second is turned away, and the tellers get a note about it.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 760 226" role="img" aria-label="A code starts as issued. Its first use by mail, online or in person makes it spent; any later use is rejected and logged. A lost ballot moves the code to revoked and issues copy n plus 1. Codes still unused when voting closes stay unused, and the key is destroyed.">
+        <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2">
+          <rect x="20" y="40" width="150" height="56" rx="28" style="fill:var(--tint)"/>
+          <rect x="300" y="40" width="150" height="56" rx="28" style="fill:var(--tint)"/>
+          <rect x="560" y="40" width="180" height="56" rx="8" stroke-dasharray="5 4" style="fill:var(--panel)"/>
+          <rect x="300" y="150" width="150" height="56" rx="28" style="fill:var(--panel)"/>
+          <rect x="20" y="150" width="150" height="56" rx="28" style="fill:var(--panel)"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13">
+          <text x="95" y="65" font-weight="600">Issued</text><text x="95" y="83" font-size="11.5" fill-opacity=".7">copy n</text>
+          <text x="375" y="65" font-weight="600">Spent</text><text x="375" y="83" font-size="11.5" fill-opacity=".7">channel + time</text>
+          <text x="650" y="65" font-weight="600">Later use rejected</text><text x="650" y="83" font-size="11.5" fill-opacity=".7">logged for tellers</text>
+          <text x="375" y="175" font-weight="600">Revoked</text><text x="375" y="193" font-size="11.5" fill-opacity=".7">copy n+1 issued</text>
+          <text x="95" y="175" font-weight="600">Unused at close</text><text x="95" y="193" font-size="11.5" fill-opacity=".7">key destroyed</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M170,62 H300" marker-end="url(#a2)"/>
+          <path d="M450,68 H560" marker-end="url(#a2)"/>
+          <path d="M170,80 H235 V178 H300" marker-end="url(#a2)"/>
+          <path d="M95,96 V150" marker-end="url(#a2)"/>
+        </g>
+        <g font-size="12" fill="currentColor" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">
+          <text x="235" y="54" text-anchor="middle">first use <tspan style="fill:var(--accent)">✉</tspan> <tspan style="fill:var(--warm)">⌨</tspan> <tspan style="fill:var(--slate)">▣</tspan></text>
+          <text x="505" y="60" text-anchor="middle">same code again</text>
+          <text x="243" y="134">lost ballot</text>
+          <text x="103" y="128">voting closes</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">Rounded boxes are states and the dashed box is an outcome, not a state change. There's no arrow back out of Spent, which is the rule that stops double voting.</figcaption>
+      <figcaption class="s">Once a ticket is used, there's no way back. A lost ticket gets cancelled and a new one printed.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 3 · Secret -->
+<section>
+  <div class="wrap">
+    <h2>Keeping the vote secret</h2>
+    <div class="prose t">
+      <p><span class="k">Derived codes, no stored list.</span> <code>S = HMAC(K, election ‖ member_id ‖ n)</code>, where K comes from the issuer's passphrase. The tool runs locally (Docker or a signed release, never pages served by the public server, which could steal K). It writes letters and uploads <code>hash(S)</code> and the ballot style. To reissue, it recomputes S for member <i>m</i>, copy <i>n</i>, revokes its hash, and issues copy <i>n</i>+1. The public log shows only a count of reissues. This follows the same idea as Belenios's credential authority: the voting server sees credential fingerprints, never who holds them ✓.</p>
+      <p><span class="k">Count key.</span> The spend list and the choices are separate tables. Before voting opens, a teller creates a count key in the teller app. Their browser makes an X25519 key pair, uploads the public half, and shows the private half as a printable QR code or passphrase. The app won't open voting until a second copy is confirmed. The key's fingerprint is printed on every ballot sheet and in the election notice, so the operator can't quietly swap in a key of their own. Each online choice is encrypted in the voter's browser to the public half (a libsodium sealed box) and stored with no code and no timestamp, in shuffled batches, and the app doesn't log IP addresses. At the count the teller enters the key in the teller app, and their browser downloads the locked choices, unlocks them on that laptop, and counts them with the paper ballots. The server never holds an unlocked online vote. Paper choices are read from sheets that were spent earlier, at receipt.</p>
+      <p><span class="k">Signed close.</span> Closing voting is the issuer key's last act. A signing key derived from the same passphrase (a separate HKDF label from the code key) signs the close time and the SHA-256 of the full list of locked votes. The server publishes the statement, and then the passphrase is destroyed. The server refuses to hand over locked votes before a valid close, and every download attempt goes in the public log. The tellers' app checks the downloaded list against the signed fingerprint before it unlocks anything, so a vote added after close shows up as a mismatch.</p>
+      <p><span class="k">Roles.</span> Roles are configurable. In <i>one-person</i> mode the issuer and teller are the same person, and the close gate and log are guardrails, not a lock, because that person holds the count key throughout. In <i>separated</i> mode the issuer never holds the count key and can't unlock online votes at all. Optionally, the operator can be a third person.</p>
+      <p><span class="k">Time-lock (opt-in).</span> An election can also lock every online vote to the drand round that falls at the close time. The browser wraps the count-key sealed box in a time-lock layer (<code>tlock-js</code>, Apache-2.0 or MIT ✓, v0.9.0, last push March 2024 ✓). Until drand publishes that round, nobody can remove the outer layer, whatever keys they hold, so even one-person mode can't peek early. At the count, the tellers' app fetches the round from a public drand relay, removes the time-lock layer, and then unlocks with the count key. drand is run by the League of Entropy, whose members include Cloudflare.</p>
+      <p><span class="k">Tamper checks.</span> Every release is built reproducibly and publishes the SHA-256 of each file the voting page loads. While voting is open, the tellers' app fetches the live voting page from the teller's own device at intervals and compares it with the release, and logs every result in the teller report. Any member can run the same comparison from a check page hosted on the project's own public site, built from the repo and outside the organisation's control. It fetches the voting page from the member's browser and hashes it. A hash shown on the voting page itself proves nothing, because a tampered page can display the genuine one. Checks catch tampering aimed at everyone, and at anyone who checks. A determined operator could still serve a checker something different from a real visit <i>(inference)</i>, so a page altered only for voters who never check can slip through.</p>
+      <p><span class="k">Bring your own voting page.</span> The voting page is also published as a static release, on the project's own site and as a download. The election link carries the server address and election ID after the <code>#</code>, which browsers never send to a server. A member using the project's copy signs in with the email link, locks the vote in their own browser, and sends only the locked vote to the organisation's server, which allows CORS from the project's site. Before it locks anything, that copy shows the count key's fingerprint and refuses to vote unless it matches the one printed on the ballot. The drand network's chain hash is a constant built into the release. Members who vote this way are protected even if the organisation's page is altered. The server still sees member and code together at the moment of voting, so this protects <i>how</i> someone voted, not <i>whether</i>.</p>
+      <p><span class="k">Key destruction at close.</span> Before the box is opened, the issuer destroys K, and the teller report records when. After that, the paper kept for the retention period (which still shows S) can't be linked to anyone.</p>
+      <p><span class="k">Small groups.</span> Separate ballot styles by membership class: a class that votes on fewer questions gets a shorter ballot. If a style or batch has fewer than about 5 ballots, the app warns and publishes only combined totals for the shared questions.</p>
+    </div>
+    <div class="prose s">
+      <p>There's no list saying "Alice got ticket 7KQ2". Instead the issuer, the person who sends out the ballots, has a secret password, a bit like a recipe. Feed in the password and Alice's member number, and out comes her code. Without the password, nobody can work it out.</p>
+      <p>That recipe is how the issuer reprints a lost ballot. When voting closes, before the box is opened, the issuer destroys the password, and the tellers write down that it was done. From then on nobody can work out which ballot is whose.</p>
+      <p>If only two or three people use one kind of ballot, their votes could be guessed just from how few there are, so the app warns about that.</p>
+      <p>Online votes are locked as soon as they're cast, with a key a teller makes before voting starts. The website stores only locked votes, so even the person running it can't read them. At the count, the teller unlocks them on their own laptop and counts them with the paper ballots.</p>
+      <p>Closing the vote is the issuer's last job. Their password signs a note saying "voting closed at 8:02 pm, and here's the fingerprint of every locked vote", and then the password is destroyed. The tellers check that fingerprint before they unlock anything. A small organisation can have one person do every job, and a bigger one can split them up.</p>
+      <p>An organisation can also switch on a time-lock. Online votes are then also locked to the closing time, using a public service run by a group of organisations that includes Cloudflare. Nobody can open them early, not even someone doing every job.</p>
+      <p>The tellers' app also checks that the voting website is running exactly the published code, and writes down every check. Any member can run the same check from the project's own website. A fingerprint shown on the voting page itself doesn't count, because a faked page could show the right one.</p>
+      <p>Even better, a member can skip the organisation's page altogether and vote from the project's own copy. It checks that the lock it uses matches the fingerprint printed on their ballot, so their vote stays private even if the organisation's website has been tampered with.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 900 180" role="img" aria-label="Timeline relative to the meeting day D: candidates posted by the notice deadline, ballots mailed a few days before the ballots-out deadline, voting open until D, at the meeting in-person voting, close and key destruction, then count, hand check and certify, and ballots and images purged when the retention period ends. All deadlines come from the rules file.">
+        <line x1="40" y1="95" x2="860" y2="95" stroke="currentColor" stroke-opacity=".5" stroke-width="1.4"/>
+        <line x1="161" y1="95" x2="342" y2="95" style="stroke:var(--accent)" stroke-width="6" stroke-linecap="round"/>
+        <g fill="currentColor">
+          <circle cx="40" cy="95" r="5"/><circle cx="135" cy="95" r="4"/><circle cx="161" cy="95" r="5"/><circle cx="342" cy="95" r="7"/><circle cx="860" cy="95" r="5"/>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-opacity=".45">
+          <line x1="40" y1="38" x2="40" y2="88"/><line x1="161" y1="66" x2="161" y2="88"/><line x1="342" y1="38" x2="342" y2="88"/><line x1="860" y1="38" x2="860" y2="88"/>
+          <line x1="135" y1="102" x2="135" y2="140"/><line x1="342" y1="102" x2="342" y2="116"/>
+        </g>
+        <g font-size="12.5" fill="currentColor" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">
+          <text x="46" y="34"><tspan font-weight="600">notice</tspan> candidates posted</text>
+          <text x="167" y="64"><tspan font-weight="600">ballots out</tspan> deadline</text>
+          <text x="348" y="34"><tspan font-weight="600">D</tspan> meeting</text>
+          <text x="348" y="64"><tspan style="fill:var(--slate)" font-weight="600">▣</tspan> in person · close · key destroyed</text>
+          <text x="854" y="34" text-anchor="end"><tspan font-weight="600">retention ends</tspan> · ballots and images purged</text>
+          <text x="250" y="122" text-anchor="middle"><tspan style="fill:var(--accent)" font-weight="600">✉</tspan> <tspan style="fill:var(--warm)" font-weight="600">⌨</tspan> voting open</text>
+          <text x="141" y="156">mail goes a few days earlier</text>
+          <text x="348" y="132">count · hand check · certify · publish</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">Deadlines from the rules file are drawn as points and the voting window as the thick segment. The spacing is only an illustration: each organisation sets its own notice, ballots-out and retention periods. Mailing a few days before the ballots-out deadline leaves time for printing and for USPS <i>(inference)</i>.</figcaption>
+      <figcaption class="s">The election calendar. The thick line is when you can post or vote online. Everything after the meeting is counting and tidying up.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 4 · Second factor -->
+<section>
+  <div class="wrap">
+    <h2>Online needs a second key</h2>
+    <div class="prose t">
+      <p>This closes the issuer attack for online voting, where the issuer recomputes a non-voter's code. The member asks for a one-time link, which is sent to the email on the frozen roll. The link opens the voting page, where the member enters their code and choices. In one transaction the server marks the link used (one per member), spends the code, and stores the locked choice apart from both.</p>
+      <ul>
+        <li>The roll, including emails, is frozen at the notice date. Every change is listed in the teller report and the old address is notified, so the issuer can't quietly change a member's email to one they control.</li>
+        <li>The server sees member and code together at the moment of voting. It doesn't store that link, but whoever runs it is trusted not to log it, as with most hosted voting services.</li>
+        <li>Members with no email on file vote <span class="ch mail">✉</span> or <span class="ch person">▣</span>.</li>
+        <li>If a member gets the ballot <i>and</i> the link by email, anyone who gets into that inbox has both.</li>
+      </ul>
+    </div>
+    <div class="prose s">
+      <p>The issuer can work out anyone's code, so online voting also needs something only the member has: a link sent to <i>their</i> email. Click the link, type the code, vote. Each link works once.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 780 230" role="img" aria-label="Sequence: the browser asks the server for a link; the server emails a one-time link to the roll address; the member opens it; the browser sends code S and the choices, and the server uses up the link and the code.">
+        <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+        <marker id="a4o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--warm)"/></marker></defs>
+        <g fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2">
+          <rect x="40" y="16" width="140" height="40" rx="8" style="fill:var(--tint)"/>
+          <rect x="320" y="16" width="140" height="40" rx="8" style="fill:var(--tint)"/>
+          <rect x="600" y="16" width="140" height="40" rx="8" style="fill:var(--tint)"/>
+          <g stroke-dasharray="3 4"><line x1="110" y1="56" x2="110" y2="222"/><line x1="390" y1="56" x2="390" y2="222"/><line x1="670" y1="56" x2="670" y2="222"/></g>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13" font-weight="600">
+          <text x="110" y="41">Member's browser</text><text x="390" y="41">Member's inbox</text><text x="670" y="41">Election server</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M110,92 H670" marker-end="url(#a4)"/>
+          <path d="M670,128 H390" marker-end="url(#a4)"/>
+          <path d="M390,164 H110" marker-end="url(#a4)"/>
+        </g>
+        <path d="M110,206 H670" fill="none" stroke-width="2.2" style="stroke:var(--warm)" marker-end="url(#a4o)"/>
+        <g font-size="12" fill="currentColor" text-anchor="middle" style="paint-order:stroke;stroke:var(--panel);stroke-width:5px">
+          <text x="250" y="85">1 · ask for a voting link</text>
+          <text x="530" y="121">2 · one-time link to roll email</text>
+          <text x="250" y="157">3 · member opens it</text>
+          <text x="390" y="199" font-weight="600" style="fill:var(--warm)">4 · ⌨ code S + choices (link and code each used once)</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">Steps 1 to 3 show the voter controls the member's email; step 4 is the vote. The server uses up the link and the code in one transaction, so neither works twice.</figcaption>
+      <figcaption class="s">Get a link by email, open it, type your code, vote.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 5 · Scanning -->
+<section>
+  <div class="wrap">
+    <h2>Scanning and counting paper</h2>
+    <div class="prose t">
+      <p>The ballot layout has four corner fiducials, a QR code (election, style, S, page) and large ovals. One TypeScript pipeline (OpenCV.js or WASM) serves both inputs: a phone-camera PWA, and a watched folder for flatbed or sheet-feeder scans run by the same core as a Node CLI. Steps: find the fiducials, correct the perspective, decode the QR code, then sample each oval's fill. Fills between two thresholds, overvotes and write-ins go to a teller adjudication queue with the image. Ranked ballots use a rank grid on the same pipeline. Each ballot yields a cast vote record (CVR) and a SHA-256 of its image. The app's tally is the working count. Tellers hand-count every paper ballot and enter their totals, and a mismatch blocks certification. Larger organisations can switch to a sampled audit; VotingWorks' Arlo (AGPL-3.0 ✓) is the reference.</p>
+      <p class="muted">Prior art: OMRChecker (MIT, active Sep 2026 ✓) for phone and scanner OMR. The VxSuite ballot interpreter is GPL-3.0-only ✓, so it can be read but its code can't be copied into an AGPL project <i>(inference: interpreter code not read)</i>.</p>
+    </div>
+    <div class="prose s">
+      <p>You can photograph a ballot with a phone, or put a stack through a scanner. The app finds the corner marks, reads the code, and checks which bubbles are filled in. Anything unclear goes to a teller to decide, with a picture of the ballot. Then the tellers count all the paper by hand. If their count and the app's count disagree, nothing is announced until they work out why.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 940 210" role="img" aria-label="Phone camera or scanner folder feeds corner finding and QR reading, then oval measurement. Clear marks become a cast vote record with an image hash; unclear marks, overvotes and write-ins go to a teller ruling first. Records add up to the app tally, which must match the tellers' hand count to certify.">
+        <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2">
+          <rect x="10" y="30" width="150" height="54" rx="8" style="fill:var(--panel)"/>
+          <rect x="200" y="30" width="160" height="54" rx="8" style="fill:var(--panel)"/>
+          <rect x="400" y="30" width="150" height="54" rx="8" style="fill:var(--panel)"/>
+          <rect x="590" y="30" width="160" height="54" rx="8" style="fill:var(--tint)"/>
+          <rect x="400" y="140" width="150" height="54" rx="8" stroke-dasharray="5 4" style="fill:var(--panel)"/>
+          <rect x="790" y="30" width="140" height="54" rx="8" style="fill:var(--tint)"/>
+          <rect x="790" y="140" width="140" height="54" rx="8" style="fill:var(--tint)"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13">
+          <text x="85" y="53" font-weight="600">Phone camera</text><text x="85" y="71" font-size="11.5" fill-opacity=".7">or scanner folder</text>
+          <text x="280" y="53" font-weight="600">Find corners</text><text x="280" y="71" font-size="11.5" fill-opacity=".7">read QR code</text>
+          <text x="475" y="53" font-weight="600">Measure ovals</text><text x="475" y="71" font-size="11.5" fill-opacity=".7">fill % per oval</text>
+          <text x="670" y="53" font-weight="600">Cast vote record</text><text x="670" y="71" font-size="11.5" fill-opacity=".7">+ image hash</text>
+          <text x="475" y="163" font-weight="600">Teller ruling</text><text x="475" y="181" font-size="11.5" fill-opacity=".7">with the image</text>
+          <text x="860" y="53" font-weight="600">App tally</text><text x="860" y="71" font-size="11.5" fill-opacity=".7">working count</text>
+          <text x="860" y="163" font-weight="600">Hand count</text><text x="860" y="181" font-size="11.5" fill-opacity=".7">by the tellers</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M160,57 H200" marker-end="url(#a5)"/>
+          <path d="M360,57 H400" marker-end="url(#a5)"/>
+          <path d="M550,57 H590" marker-end="url(#a5)"/>
+          <path d="M750,57 H790" marker-end="url(#a5)"/>
+          <path d="M475,84 V140" marker-end="url(#a5)"/>
+          <path d="M550,167 H660 V84" marker-end="url(#a5)"/>
+          <path d="M860,84 V140" marker-start="url(#a5)" marker-end="url(#a5)" stroke-width="2"/>
+        </g>
+        <g font-size="11.5" fill="currentColor" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">
+          <text x="570" y="49" text-anchor="middle">clear</text>
+          <text x="483" y="116">unclear · write-in</text>
+          <text x="604" y="160" text-anchor="middle">ruled</text>
+          <text x="852" y="116" text-anchor="end" font-weight="600">must match to certify</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">The dashed box is the only step where a person decides a mark. The double-headed arrow on the right is the certification gate: either count can catch an error in the other.</figcaption>
+      <figcaption class="s">The machine reads the ballots, a person decides anything unclear, and a hand count double-checks the machine.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- 6 · Mail API -->
+<section>
+  <div class="wrap">
+    <h2>Mailing ballots through an API</h2>
+    <div class="prose s">
+      <p>A mail company can print each member's letter and ballot, put them in an envelope with a return envelope, and post them. You send it a file; it does the rest. Nobody in the organisation ever folds, stuffs or even sees a ballot next to a name.</p>
+      <p>Two things don't change. The mail company sees names next to codes, because it prints them. And the issuer's password can still work out any code. So it takes volunteers' hands off the paper, but it doesn't remove the need to trust the issuer.</p>
+      <p>The catch is the return envelope. Neither mail company will put postage on it for a small organisation. Lob's return envelopes come without postage, and its prepaid option is only for its biggest customers. PostGrid sells return envelopes 5,000 at a time.</p>
+      <p>For an organisation of a few dozen members, the cheapest way to keep postal voting free for members is to print the packets, stamp each return envelope, and post them. That's about <b>$90</b> for 50 members. Paying the Post Office only for the ballots that come back works out cheaper only for organisations with thousands of members.</p>
+    </div>
+    <div class="prose t">
+      <p><span class="k">What it takes.</span></p>
+      <ul>
+        <li>An account with a test key and a live key, stored only on the issuer's machine and used by the local tool.</li>
+        <li>One API call per member: the address, a file (the tool's own 8.5×11 PDF, so the fiducials and ovals print exactly as designed), First-Class mail, and a return envelope. Lob's letters API takes <code>return_envelope</code> with a required <code>perforated_page</code>; PostGrid takes a <code>returnEnvelope</code> ID ordered in advance ✓. Both also accept HTML templates with merge variables ✓.</li>
+        <li>Test first: PostGrid says test-mode orders "will not be sent out" ✓.</li>
+        <li>Address verification is optional: Lob Developer charges $0.05 each ✓.</li>
+        <li>Mail class: PostGrid restricts Standard (marketing) class to marketing mail ✓, so ballots go First-Class, which PostGrid quotes at 5–7 business days ✓.</li>
+      </ul>
+      <p><span class="k">Effect on trust.</span> It removes the stuffing step, where a volunteer sees code and name together, and adds a vendor that holds name, address and code. Neither Lob nor PostGrid states a retention period on the pages read ✓, so TRUST.md lists the vendor as a party that sees codes. A stricter <i>no-key mode</i> becomes possible: the tool generates random codes, sends them straight to the API, uploads hashes, and keeps nothing. Nobody in the organisation could ever recompute a code, but a lost ballot could then not be revoked. Ruled out: member elections need reissue.</p>
+      <p><span class="k">Prepaid return.</span></p>
+      <ul>
+        <li><b>Lob:</b> its return envelopes "come without prepaid postage" ✓. Its Business Reply Mail is Enterprise-only, needs the customer's own USPS permit, and uses a USPS-approved design with no custom artwork ✓.</li>
+        <li><b>PostGrid:</b> return envelopes are pre-ordered with a minimum of 5,000, and postage is not stated ✓.</li>
+        <li><b>USPS</b> (DMM 505 and Notice 123 ✓):
+          <ul>
+            <li>a stamp on every return envelope: $0.82</li>
+            <li>metered prepaid reply: $0.78, which needs a meter or PC postage, an undated indicia and the "postage has been prepaid by" legend</li>
+            <li>Business Reply Mail (BRM) Basic: $390 a year plus $0.82 + $1.31 per returned piece</li>
+            <li>Qualified BRM: $1,130 a year plus $0.794 + $0.058 per returned piece, with USPS approval</li>
+          </ul>
+        </li>
+        <li><b>Break-even:</b> BRM Basic beats stamping every envelope only when <code>N × (0.82 − 2.13p) &gt; 390</code>, where N is the number of members and p the share of ballots returned by mail. At 30% returns that's about 2,150 members; at 50% it never does. Qualified BRM at 50% returns needs about 2,870 members.</li>
+      </ul>
+      <p>So the default mailing path for the niche is a <b>print-at-home packet</b>: per-member PDFs in mailing order, laid out for a #10 window envelope with the ballot folded code-inward, plus #9 return envelopes printed with the organisation's address and stamped by volunteers. The mail API stays as an adapter for larger organisations, where members supply their own stamp or an Enterprise contract adds BRM.</p>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Route (50 packets, B&amp;W, 2 pages, First-Class)</th><th>Per packet out</th><th>Return postage</th><th>50 packets</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td><b>Print at home, stamped return</b> (recommended for small organisations)</td><td class="num">$0.82 stamp + paper and envelopes</td><td class="num"><b>$0.82 stamp, paid by the organisation</b></td><td class="num"><b>≈ $90</b></td><td>USPS Notice 123, effective 4 Oct 2026 ✓; supplies and a packet under 1 oz <i>(inference)</i></td></tr>
+          <tr><td>Same, metered instead of stamps</td><td class="num">$0.78 metered</td><td class="num">$0.78 prepaid reply indicia</td><td class="num">≈ $86</td><td>DMM 505 §2.5, Notice 123 ✓; needs a meter or PC postage</td></tr>
+          <tr><td><b>PostGrid</b> Starter ($0/month, ≤500 mailings/month)</td><td class="num">$1.059 + $0.10 extra page = $1.16</td><td>member's own stamp; return envelopes pre-ordered, minimum 5,000 ✓</td><td class="num">≈ $58</td><td>postgrid.com pricing, guides.postgrid.com ✓</td></tr>
+          <tr><td><b>Lob</b> Developer ($0/month)</td><td class="num">$1.066 + $0.101 + $0.04 return env. = $1.21</td><td>member's own stamp: envelopes "come without prepaid postage" ✓</td><td class="num">≈ $60</td><td>help.lob.com table dated 1 Nov 2026 ✓; lob.com/pricing still says "from $0.828"</td></tr>
+          <tr><td><b>Business Reply Mail</b> (Basic): pay only for ballots returned</td><td>—</td><td class="num">$390/yr permit + $0.82 + $1.31 per returned ballot</td><td class="num">+ ≈ $497</td><td>DMM 505, Notice 123 ✓</td></tr>
+          <tr><td><b>Qualified BRM</b></td><td>—</td><td class="num">$1,130/yr + $0.794 + $0.058 per returned ballot</td><td class="num">+ ≈ $1,173</td><td>DMM 505, Notice 123 ✓; needs USPS approval</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted" style="font-size:14px">USPS has a price change listed for 17 Jan 2027 ✓. Click2Mail's site refused automated reading, so it's not priced here. BRM and Qualified BRM totals assume all 50 ballots come back by mail.</p>
+  </div>
+</section>
+
+<!-- 6b · Practical safeguards -->
+<section>
+  <div class="wrap">
+    <h2>Practical safeguards</h2>
+    <div class="prose t"><p>These gaps sit outside the trust model. Each was found in review, and each has a fix in the design.</p></div>
+    <div class="prose s"><p>Some everyday problems the design had to solve, and how it solves them.</p></div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Gap</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td><span class="t">Tellers could see the marks while scanning a mailed ballot's code, and a return address or postmark could link the member to them.</span><span class="s">Tellers could see your marks when checking your code.</span></td><td><span class="t">The QR code prints on the outside panel of the folded sheet and scans without unfolding. Return envelopes are plain and pre-addressed, printed with "Don't write your name or address". In-person drops use the same fold.</span><span class="s">The code is on the outside of the folded ballot, so it can be checked without opening it.</span></td></tr>
+          <tr><td><span class="t">A spent code can't be pulled back to challenge an ineligible vote, because votes are stored without codes.</span><span class="s">What if someone's right to vote is disputed?</span></td><td><span class="t">Disputed members get a provisional ballot style. Provisional ballots are kept as a sealed batch and counted only if the tellers uphold eligibility; otherwise they're destroyed unread. The small-group warning applies.</span><span class="s">They vote on a separate ballot that's counted only if the tellers agree they were eligible.</span></td></tr>
+          <tr><td><span class="t">Only the tellers' laptop ever sees unlocked online votes, so nobody else can check the online count.</span><span class="s">Nobody else could check the online count.</span></td><td><span class="t">After certification the count key's private half is published alongside the locked-vote list whose fingerprint was signed at close, so anyone can unlock and recount. The votes carry no codes, and the small-group warning covers small styles.</span><span class="s">Once the result is final, the key is published so anyone can recount.</span></td></tr>
+          <tr><td><span class="t">A lost issuer passphrase means no reissues and no signed close, so the count can't start.</span><span class="s">If the issuer loses their password, the vote could get stuck.</span></td><td><span class="t">Opening voting requires a confirmed second copy of the passphrase. If both copies are lost, the tellers sign a fallback close, which the public log marks as a fallback.</span><span class="s">There must be a backup copy, and as a last resort the tellers can close the vote, in public.</span></td></tr>
+          <tr><td><span class="t">Whoever draws a lot to break a tie could rig it.</span><span class="s">Drawing names from a hat can be rigged.</span></td><td><span class="t">The lot uses the first drand round published after close as public randomness, so anyone can repeat the draw.</span><span class="s">The draw uses a public random number nobody controls, so anyone can repeat it.</span></td></tr>
+          <tr><td><span class="t">Nothing covered blind or low-vision members, or screen readers.</span><span class="s">Not everyone can read a small paper ballot.</span></td><td><span class="t">The voting and teller pages meet WCAG 2.1 AA, there's a large-print ballot style, and any member sent paper can vote online instead.</span><span class="s">Large-print ballots, a voting page that works with screen readers, and online voting as an alternative.</span></td></tr>
+          <tr><td><span class="t">A runoff needs new codes, a new mailing and weeks of delay.</span><span class="s">A tie can mean voting all over again.</span></td><td><span class="t">"Clone as runoff" copies the roll and rules into a new election with fresh codes. The docs point out that ranked choice (IRV) is an instant runoff.</span><span class="s">One click sets up the runoff. Or use ranked voting, which never needs one.</span></td></tr>
+          <tr><td><span class="t">Laws on electronic and mail voting vary by place and by type of organisation <i>(inference)</i>.</span><span class="s">Different places have different rules about voting.</span></td><td><span class="t">The README tells each organisation to check its own rules and law. The project makes no legal claims.</span><span class="s">The instructions tell every organisation to check its own.</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · Trust -->
+<section>
+  <div class="wrap">
+    <h2>Who you have to trust (TRUST.md)</h2>
+    <div class="prose t">
+      <p>This becomes a top-level <code>TRUST.md</code>, linked from the first screen of the README. Each role below is matched against what it could do if it were dishonest. Glyphs: <span class="g">●</span> yes · <span class="g">◐</span> partly or only until close · <span class="g">○</span> no.</p>
+    </div>
+    <div class="prose s">
+      <p>No election system can be trusted completely. This table says who has to be honest for this one to work, and what they could get away with if they weren't. <span class="g">●</span> means yes, <span class="g">◐</span> means partly, <span class="g">○</span> means no.</p>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Who</th><th>Sees name next to code</th><th>Sees choices</th><th>Could vote as someone else</th><th>Who would notice</th></tr></thead>
+        <tbody>
+          <tr><td><b>Issuer</b> (sends out the ballots)</td><td><span class="g">◐</span> can recompute any code until close</td><td><span class="g">○</span></td><td><span class="g">◐</span> by paper, for members who don't vote; not online</td><td>a member who checks the tracker</td></tr>
+          <tr><td><b>Volunteers stuffing packets, or a mail service</b></td><td><span class="g">●</span> handles them</td><td><span class="g">○</span></td><td><span class="g">◐</span> by paper</td><td>a member who checks the tracker</td></tr>
+          <tr><td><b>Anyone holding a ballot</b></td><td><span class="g">●</span></td><td><span class="g">○</span></td><td><span class="g">●</span> that one ballot</td><td>the member, when their code shows as used</td></tr>
+          <tr><td><b>Someone in the member's inbox</b></td><td><span class="g">●</span> if the ballot was emailed</td><td><span class="g">○</span></td><td><span class="g">●</span> online too: both factors in one inbox</td><td>the member</td></tr>
+          <tr><td><b>Server operator</b></td><td><span class="g">◐</span> online voters, at the moment they vote</td><td><span class="g">◐</span> only by tampering with the voting page, and not for members using the project's copy</td><td><span class="g">◐</span> by editing the database</td><td>tellers' release-hash checks; count reconciliation; members checking the tracker</td></tr>
+          <tr><td><b>Issuer and operator together</b></td><td><span class="g">●</span></td><td><span class="g">◐</span> only by tampering with the voting page</td><td><span class="g">●</span></td><td>nobody</td></tr>
+          <tr><td><b>Tellers</b></td><td><span class="g">○</span></td><td><span class="g">●</span> paper, and online votes at the count, without codes</td><td><span class="g">◐</span> through rulings on unclear marks</td><td>a second teller; images kept for the retention period</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="cols">
+      <div>
+        <h3>Weaknesses of the design</h3>
+        <ul class="t">
+          <li>No coercion resistance: remote voting can't stop someone watching, or a code being sold. Helios's FAQ says online elections fit groups that don't expect large attempts at fraud or coercion ✓.</li>
+          <li>Small anonymity sets in a few-dozen electorate: the app warns but can't fix it.</li>
+          <li>Write-ins and handwriting can identify a voter to the tellers.</li>
+          <li>Key destruction can't be proven.</li>
+          <li>Not end-to-end verifiable: a member can check their ballot was <i>received</i>, not that it was <i>counted as cast</i>.</li>
+          <li>Online votes are locked with the tellers' count key, but whoever runs the server also serves the voting page and could change it to copy votes before they're locked. The tellers' checks, and members using the project-hosted checker, catch tampering aimed at everyone and at anyone who checks, but not a page altered only for voters who never check. Members who vote from the project's copy, and match the printed count key fingerprint, are protected either way.</li>
+          <li>Publishing the count key after certification lets anyone recount online votes, but a small ballot style or weight group can then be read in the published set too. The small-group warning covers this.</li>
+          <li>In one-person mode, the same person holds the count key all through voting. The close gate and the public log are guardrails, not a lock, unless the time-lock is on.</li>
+          <li>With the time-lock on, the count needs drand to be reachable, the close time is fixed when voting opens, and extending voting lets votes already cast be unlocked at the original time.</li>
+          <li>If every copy of the count key is lost, the online votes can't be opened.</li>
+          <li>An outage on the deadline day blocks online voting, and paper at the meeting is the fallback.</li>
+          <li>Some rules can't be offered: changing a vote after casting it, and enforcing limits on proxies.</li>
+          <li>Not certified, and not for public elections.</li>
+        </ul>
+        <ul class="s">
+          <li>Someone could stand over a member while they vote at home, and the system can't stop that.</li>
+          <li>With very few voters of one kind, their choices are easier to guess.</li>
+          <li>A handwritten name in a write-in can give away who you are.</li>
+          <li>The issuer promises to destroy the password, and nobody can prove it was done.</li>
+          <li>You can check your ballot arrived, not that it was counted correctly.</li>
+          <li>The website can't read online votes, but whoever runs it must not secretly change it. The tellers' checks would catch most changes.</li>
+          <li>If one person does every job, the app stops them peeking early and logs any attempt, but it can't make peeking impossible unless the time-lock is on.</li>
+          <li>Lose every copy of the count key and the online votes are lost.</li>
+          <li>Once your vote is in, you can't change it.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Use something else when</h3>
+        <ul class="t">
+          <li>The organisation can't name an issuer and an operator it trusts, and keep them as different people.</li>
+          <li>It expects coercion or vote buying.</li>
+          <li>It needs secrecy that holds even against its own officers. For online-only votes, Belenios (AGPL-3.0 ✓) or Helios (Apache-2.0 ✓) offer cryptographic guarantees.</li>
+        </ul>
+        <ul class="s">
+          <li>The organisation doesn't trust its issuer and its website operator to stay honest and separate.</li>
+          <li>People might be pressured into voting a certain way.</li>
+          <li>The vote must stay secret even from the organisation's own officers.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7b · Rules -->
+<section>
+  <div class="wrap">
+    <h2>Each organisation's own rules</h2>
+    <div class="prose t">
+      <p>The rules system has three layers.</p>
+      <ul>
+        <li><span class="k">Settings.</span> A YAML rules file checked against a published schema. It holds anything that is a value: deadlines, which channels are allowed, who is eligible for which question, seats, write-ins, quorum, tie-break order, retention, and notice wording. The schema grows by release.</li>
+        <li><span class="k">Modules.</span> Anything that is behaviour is a small module in the project's code, added through review with its own tests. Interfaces:
+          <ul>
+            <li><code>count(records, contest) → result + explanation</code></li>
+            <li><code>eligible(member, contest) → weight</code></li>
+            <li><code>layout(contest) → ballot regions</code></li>
+          </ul>
+          Organisations don't write scripts. That keeps every election's logic code that has been reviewed and can be audited.</li>
+        <li><span class="k">Audit binding.</span> The teller report records the rules file's SHA-256 and the software version. Every count module writes a step-by-step explanation a member can follow, such as each round of a ranked count and each transfer in STV.</li>
+      </ul>
+      <p>Counting modules in the first version:</p>
+      <ul>
+        <li>plurality, single and multi-seat</li>
+        <li>yes/no with any threshold, of votes cast or of members</li>
+        <li>approval</li>
+        <li>ranked choice, both IRV and STV</li>
+        <li>weighted votes, for example one vote per unit or per share</li>
+      </ul>
+      <p>Ranked ballots use a rank grid (candidates × ranks) through the same scanning pipeline. Skipped or repeated ranks go to the tellers.</p>
+    </div>
+    <div class="prose s">
+      <p>Every organisation runs its votes differently. Some need two-thirds to pass a motion, some let you rank candidates, some give each house or share one vote. The organisation writes its own rules into a settings file. How votes are counted comes from tried and tested building blocks that anyone can inspect. The final report says exactly which rules were used, and shows the count step by step.</p>
+    </div>
+    <figure>
+      <div class="scroll">
+      <svg viewBox="0 0 900 250" role="img" aria-label="The rules file configures three kinds of reviewed module: eligibility and weight, ballot layout, and counting. Counting produces the result with a step-by-step explanation. The teller report records the rules file hash and the software version.">
+        <defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+        <g fill="none" stroke="currentColor" stroke-opacity=".55" stroke-width="1.2">
+          <rect x="20" y="70" width="190" height="110" rx="8" style="fill:var(--panel)"/>
+          <rect x="300" y="20" width="270" height="56" rx="8" style="fill:var(--tint)"/>
+          <rect x="300" y="96" width="270" height="56" rx="8" style="fill:var(--tint)"/>
+          <rect x="300" y="172" width="270" height="62" rx="8" style="fill:var(--tint)"/>
+          <rect x="660" y="120" width="220" height="62" rx="8" style="fill:var(--panel)"/>
+          <rect x="660" y="20" width="220" height="62" rx="8" stroke-dasharray="5 4" style="fill:var(--panel)"/>
+        </g>
+        <g fill="currentColor" text-anchor="middle" font-size="13">
+          <text x="115" y="100" font-weight="600">Rules file</text>
+          <text x="115" y="120" font-size="11.5" fill-opacity=".7">settings, checked</text>
+          <text x="115" y="137" font-size="11.5" fill-opacity=".7">against a schema</text>
+          <text x="115" y="160" font-size="11.5" class="mono" font-family="var(--font-mono)">rules.yaml</text>
+          <text x="435" y="44" font-weight="600">Eligibility and weight</text>
+          <text x="435" y="62" font-size="11.5" fill-opacity=".7">classes · one vote per unit or share</text>
+          <text x="435" y="120" font-weight="600">Ballot layout</text>
+          <text x="435" y="138" font-size="11.5" fill-opacity=".7">ovals · rank grid · styles per class</text>
+          <text x="435" y="196" font-weight="600">Counting</text>
+          <text x="435" y="214" font-size="11.5" fill-opacity=".7">plurality · yes/no · approval</text>
+          <text x="435" y="229" font-size="11.5" fill-opacity=".7">IRV · STV · weighted</text>
+          <text x="770" y="146" font-weight="600">Result</text>
+          <text x="770" y="164" font-size="11.5" fill-opacity=".7">+ step-by-step explanation</text>
+          <text x="770" y="46" font-weight="600">Teller report</text>
+          <text x="770" y="64" font-size="11.5" fill-opacity=".7">rules hash + software version</text>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <path d="M210,100 H250 V48 H300" marker-end="url(#a7)"/>
+          <path d="M210,124 H300" marker-end="url(#a7)"/>
+          <path d="M210,150 H250 V203 H300" marker-end="url(#a7)"/>
+          <path d="M570,203 H615 V151 H660" marker-end="url(#a7)"/>
+          <path d="M770,120 V82" marker-end="url(#a7)"/>
+        </g>
+        <g font-size="11.5" fill="currentColor" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">
+          <text x="256" y="90">configures</text>
+          <text x="622" y="196">produces</text>
+          <text x="778" y="105">recorded in</text>
+        </g>
+      </svg>
+      </div>
+      <figcaption class="t">Shaded boxes are reviewed code modules and the plain box is the organisation's own file. The dashed teller report ties each published result to the exact rules and code that produced it.</figcaption>
+      <figcaption class="s">The organisation fills in its settings, tested building blocks do the work, and the report shows which rules were used.</figcaption>
+    </figure>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Rule an organisation might want</th><th>Supported?</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Any deadlines, quorum, thresholds, seats, eligibility by class</td><td><span class="g">●</span> yes</td><td>Settings</td></tr>
+          <tr><td>New counting method (Condorcet, score, cumulative)</td><td><span class="g">◐</span> as a module</td><td>Added through review, with tests and an explanation</td></tr>
+          <tr><td>Weighted votes</td><td><span class="g">●</span> yes</td><td>Weight travels with the ballot style, so small weight groups get the anonymity warning</td></tr>
+          <tr><td>Change your vote before close</td><td><span class="g">○</span> no</td><td>Votes are stored without codes, so an earlier vote can't be found to replace. It would need votes linked to codes, which this design avoids</td></tr>
+          <tr><td>Limit how many proxies one person holds</td><td><span class="g">○</span> can't be enforced</td><td>Anyone holding a code can vote with it; checking who holds codes would break the secret ballot</td></tr>
+          <tr><td>Recorded (named) votes, such as board roll calls</td><td><span class="g">◐</span> later mode</td><td>Deliberately keeps and publishes the code-to-member link</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · Landscape -->
+<section>
+  <div class="wrap">
+    <h2>What already exists</h2>
+    <div class="prose t"><p>The only product that states it stops double votes across mail, online and in-person voting is commercial (Simply Voting: "voter strike-off" plus "unique, anonymous QR code" ✓). The open source tools are online-only or built for government elections. That gap is this project's niche: elections run by each organisation's own rules, for clubs, nonprofits, HOAs and union locals, with tellers, on cheap hosting.</p></div>
+    <div class="prose s"><p>Paid services already do this. Free, open tools either do online voting only or are built for government elections. Nothing open does what a small member organisation needs.</p></div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Tool</th><th>✉ Mail</th><th>⌨ Online</th><th>▣ In person</th><th>Stops double votes across channels</th><th>Licence</th></tr></thead>
+        <tbody>
+          <tr><td>Helios ✓</td><td>—</td><td>● encrypted</td><td>"not done yet"</td><td>—</td><td>Apache-2.0</td></tr>
+          <tr><td>Belenios ✓</td><td>not stated</td><td>● credentials; last vote counts</td><td>not stated</td><td>—</td><td>AGPL-3.0</td></tr>
+          <tr><td>ElectionGuard ✓</td><td colspan="3">SDK inside another system (encryption, guardians, verifiable record)</td><td>—</td><td>MIT</td></tr>
+          <tr><td>VotingWorks VxSuite ✓</td><td>● central scan</td><td>—</td><td>● precinct scan, BMD, poll book</td><td>government scale</td><td>GPL-3.0 only</td></tr>
+          <tr><td>OpaVote ✓</td><td>counts only</td><td>●</td><td>● booths</td><td>not stated</td><td>commercial</td></tr>
+          <tr><td>ElectionBuddy ✓</td><td>◐ top tier; keyed in by hand</td><td>●</td><td>● kiosk</td><td>not stated</td><td>commercial</td></tr>
+          <tr><td>Simply Voting ✓</td><td>● anonymous QR</td><td>●</td><td>● strike-off</td><td><b>● stated</b></td><td>commercial</td></tr>
+          <tr><td><b>This project</b></td><td>● coded sheet</td><td>● code + email link</td><td>● same sheet</td><td><b>● one spend list</b></td><td>AGPL-3.0</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 9 · Scope -->
+<section>
+  <div class="wrap">
+    <h2>What gets built first</h2>
+    <div class="cols">
+      <div>
+        <h3>First version</h3>
+        <ul class="t">
+          <li>Roll import (CSV) with membership classes, frozen at the notice date</li>
+          <li>Rules file (settings and schema) plus counting modules: plurality, yes/no with any threshold, approval, ranked choice (IRV and STV), weighted votes</li>
+          <li>Local issuer tool: derived codes, PDFs, mail API and email, reissue, key destruction</li>
+          <li>Online voting: a one-time email link plus the code</li>
+          <li>Count key: online votes locked in the browser and unlocked on a teller's laptop at the count, with two copies required</li>
+          <li>Configurable roles (one person or separated); the issuer key signs the close; counting checks that signature</li>
+          <li>Release hashes, tamper checks of the live voting page from the tellers' app, and a member checker hosted on the project's own site</li>
+          <li>Optional drand time-lock: online votes also locked to the close time</li>
+          <li>Project-hosted and downloadable voting page, checked against the count key fingerprint printed on the ballot</li>
+          <li>Practical safeguards: QR on the outside of the fold, provisional ballots, count key published after certification, passphrase backup and fallback close, drand-drawn lots, WCAG 2.1 AA and large print, clone as runoff, and a legal note in the README</li>
+          <li>Teller PWA: arrival scan, count scan, adjudication, hand-count entry</li>
+          <li>Public page: tracker, counts by channel, certified results, teller report</li>
+          <li>Purge when retention ends, with a log of what was destroyed</li>
+        </ul>
+        <ul class="s">
+          <li>Load the member list</li>
+          <li>Set the rules from the organisation's rulebook, including ranked and weighted voting</li>
+          <li>Print or post the ballots</li>
+          <li>Vote online, locked so the website can't read it</li>
+          <li>Large-print ballots and a page that works with screen readers</li>
+          <li>Phone app for the tellers</li>
+          <li>Public page with results</li>
+          <li>Delete everything when the keeping period ends</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Later (v2 and after)</h3>
+        <ul class="t">
+          <li>Optional split count key, so any 2 of 3 tellers are needed to unlock</li>
+          <li>More counting modules (Condorcet, score, cumulative) and a recorded-vote mode</li>
+          <li>Sampled audits for large organisations</li>
+          <li>Hosted service for many organisations</li>
+        </ul>
+        <ul class="s">
+          <li>More ways of counting votes</li>
+          <li>Tools for big organisations</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Stack and hosting</h3>
+        <ul class="t">
+          <li>TypeScript core: rules, codes, OMR, tally</li>
+          <li>Cloudflare: Workers, D1, R2, and Access for tellers</li>
+          <li>Docker: Node, SQLite, local disk</li>
+          <li>One web framework for both <i>(Hono runs on Workers and Node: inference)</i>. D1 is SQLite underneath, so one schema covers both</li>
+          <li>CI tests both targets</li>
+          <li>Voter-facing parts run on reliable hosting, not a home connection</li>
+          <li>Licence AGPL-3.0</li>
+        </ul>
+        <ul class="s">
+          <li>Runs free on Cloudflare, or on any computer with Docker</li>
+          <li>Open source, and anyone who changes it and offers it as a service has to share their changes</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · Decisions -->
+<section>
+  <div class="wrap">
+    <h2>Decisions so far</h2>
+    <ol class="decisions">
+      <li>The code goes on the ballot sheet itself. No envelopes and no name on the ballot. Copies are harmless because the first use wins.</li>
+      <li>Codes are derived from the issuer's passphrase. No list is ever stored. The passphrase is destroyed and logged at close.</li>
+      <li>First use wins. Mail is spent on arrival, and the marks are read at the count.</li>
+      <li>Online votes are locked in the voter's browser with a count key a teller creates before voting (two copies required), and unlocked only on a teller's laptop at the count. They're stored without codes or timestamps, in shuffled batches.</li>
+      <li>A public tracker, with results after the tellers certify them.</li>
+      <li>Cloudflare and Docker both in the MVP, sharing one core.</li>
+      <li>Licence: AGPL-3.0.</li>
+      <li>Scanning by phone camera plus a watched scanner folder.</li>
+      <li>The app counts and the tellers verify with a hand count. A mismatch blocks certification.</li>
+      <li>Separate ballot styles by class, with a small-group warning.</li>
+      <li>TRUST.md in the repo, linked from the README.</li>
+      <li>Online votes need a second factor: a one-time link sent to the member's own email.</li>
+      <li>Mailing for small organisations: print-at-home packets with a stamped return envelope (about $90 for 50). The mail API is an adapter for larger organisations.</li>
+      <li>Reissue is required, so the issuer passphrase stays and no-key mode is ruled out.</li>
+      <li>Rules are open-ended: values go in a schema-checked rules file, and behaviour comes from reviewed code modules. Organisations don't write scripts. Each teller report records the rules hash and the software version.</li>
+      <li>The first version counts by plurality, yes/no with any threshold, approval, ranked choice (IRV and STV), and weighted votes.</li>
+      <li>Kept proportionate: no ElectionGuard, no key-splitting ceremony, no blind signatures. This is for clubs and nonprofits, not high-stakes public elections.</li>
+      <li>A count key, made by a teller before voting, locks online votes. The server never holds an unlocked one.</li>
+      <li>Tamper checks: each release publishes file hashes, and the tellers' app checks the live voting page against them during voting and logs the results.</li>
+      <li>Roles are configurable: one person, or separated. The issuer key signs the close, and counting needs the count key and checks that signature.</li>
+      <li>A drand time-lock is an opt-in in the first version: online votes are locked to the close time as well as the count key.</li>
+      <li>Members can vote from the project's own copy of the voting page. The count key fingerprint is printed on every ballot, and the project's copy won't vote unless it matches.</li>
+      <li>Practical safeguards: QR on the outside of the folded sheet with plain return envelopes; provisional ballots for disputed members; the count key published after certification for public recount; a second copy of the issuer passphrase and a tellers' fallback close; ties drawn from drand; WCAG 2.1 AA, large print and online as an alternative; clone as runoff; and a README note that each organisation checks its own rules and law.</li>
+    </ol>
+    <p class="muted" style="font-size:14px">Still open: the project's name.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Design notes for an open source election system for member organisations run by volunteer tellers. Facts marked ✓ were checked against each project's own repo or site on 16 Nov 2026. Prices are as published on that date.</div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement;
+  var buttons = document.querySelectorAll('.switch button');
+  function apply(level) {
+    if (level !== 'simple' && level !== 'technical') level = 'technical';
+    root.setAttribute('data-level', level);
+    buttons.forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.level === level)); });
+    try { localStorage.setItem('ballot-level', level); } catch (e) {}
+    return level;
+  }
+  var fromHash = location.hash.replace('#', '');
+  var saved = null;
+  try { saved = localStorage.getItem('ballot-level'); } catch (e) {}
+  apply(fromHash === 'simple' || fromHash === 'technical' ? fromHash : (saved || 'technical'));
+  buttons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      var l = apply(b.dataset.level);
+      if (location.hash !== '#' + l) location.hash = l;
+    });
+  });
+  window.addEventListener('hashchange', function () {
+    var h = location.hash.replace('#', '');
+    if (h === 'simple' || h === 'technical') apply(h);
+  });
+})();
+</script>

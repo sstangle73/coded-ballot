@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.wrangler/
+*.sqlite
+*.sqlite-journal
+.dev.vars
+.env
+/out/

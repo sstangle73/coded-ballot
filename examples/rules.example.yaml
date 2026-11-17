@@ -1,0 +1,78 @@
+# An example rules file for a made-up organisation. Every value here is a setting; how votes are counted comes
+# from reviewed code modules chosen by `method`. Check yours with the issuer tool before you use it.
+schema_version: 1
+
+election:
+  id: agm-2027
+  title: Annual general meeting 2027
+  organisation: Example Rowing Club
+  timezone: America/New_York
+
+dates:
+  notice: 2027-03-01T09:00:00-05:00        # the roll, with emails, is frozen here
+  ballots_out: 2027-03-08T09:00:00-05:00
+  voting_opens: 2027-03-08T09:00:00-05:00
+  voting_closes: 2027-03-29T19:00:00-04:00
+  meeting: 2027-03-29T19:00:00-04:00
+
+retention_days: 90
+
+roles:
+  mode: separated          # or one_person
+
+channels:
+  mail: true
+  online: true
+  in_person: true
+
+time_lock:
+  enabled: false
+
+classes:
+  - id: full
+    label: Full member
+  - id: associate
+    label: Associate member
+  - id: owner
+    label: Boat-share owner
+    weight: { column: shares }   # one vote per share, from the roll's "shares" column
+
+contests:
+  - id: chair
+    title: Chair
+    method: irv
+    candidates:
+      - { id: ana, name: Ana Example }
+      - { id: ben, name: Ben Example }
+      - { id: cai, name: Cai Example }
+    eligible_classes: [full]
+
+  - id: committee
+    title: Committee (3 seats)
+    method: stv
+    seats: 3
+    candidates:
+      - { id: dee, name: Dee Example }
+      - { id: eli, name: Eli Example }
+      - { id: fay, name: Fay Example }
+      - { id: gus, name: Gus Example }
+      - { id: hal, name: Hal Example }
+    eligible_classes: [full, associate]
+
+  - id: motion-1
+    title: Motion 1 - change the club's name
+    method: yes_no
+    threshold: { fraction: 2/3, of: votes_cast, rule: at_least }
+    eligible_classes: [full]
+
+  - id: boathouse
+    title: Boathouse roof - repair this year
+    method: yes_no
+    weighted: true
+    eligible_classes: [owner]
+
+quorum:
+  fraction_of_members: 1/10
+
+tie_break: [previous_rounds, lot]
+small_group_threshold: 5

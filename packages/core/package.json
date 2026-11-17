@@ -1,0 +1,31 @@
+{
+  "name": "@coded-ballot/core",
+  "version": "0.1.0",
+  "description": "coded-ballot core: rules, roll, codes, spend list and counting modules",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "schema": "node scripts/write-schema.ts"
+  },
+  "dependencies": {
+    "@noble/hashes": "^2.4.0",
+    "@scure/bip39": "^2.4.0",
+    "@types/libsodium-wrappers-sumo": "^0.7.8",
+    "libsodium-wrappers": "^0.8.4",
+    "libsodium-wrappers-sumo": "^0.8.4",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/libsodium-wrappers": "^0.7.14",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
