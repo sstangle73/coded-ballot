@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { drawLot, firstRoundAfter, randomnessMatchesSignature, roundAt, roundTime } from '../src/lot.ts';
+import { drawLot, firstRoundAfter, lotForClose, randomnessMatchesSignature, roundAt, roundTime } from '../src/lot.ts';
 
 // Round 34027746 of drand quicknet, fetched from api.drand.sh on 2026-11-16.
 const ROUND = {
@@ -33,5 +33,11 @@ describe('drand lot', () => {
       ]
     `);
     expect(drawLot({ ...ROUND, randomness: 'ab'.repeat(32) }, 'x', ['p', 'q']).keys).not.toEqual(drawLot(ROUND, 'x', ['p', 'q']).keys);
+  });
+  it('accepts only the first round after close, with matching randomness', () => {
+    const closedAt = new Date((roundTime(ROUND.round) - 1) * 1000);
+    expect(lotForClose(ROUND, closedAt)).toEqual({ round: ROUND.round, randomness: ROUND.randomness });
+    expect(() => lotForClose(ROUND, new Date(roundTime(ROUND.round) * 1000))).toThrow(/first after close/);
+    expect(() => lotForClose({ ...ROUND, randomness: 'ab'.repeat(32) }, closedAt)).toThrow(/does not match/);
   });
 });

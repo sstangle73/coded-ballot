@@ -5,6 +5,7 @@
 // If every copy of the passphrase is lost, the tellers record a fallback close instead. It carries no issuer
 // signature and is marked as a fallback everywhere it appears.
 import { canonicalJson, concatBytes, fromBase64, lengthPrefixed, sha256Hex, toBase64, utf8ToBytes } from './bytes.ts';
+import { ed25519, x25519 } from '@noble/curves/ed25519.js';
 import { sodium } from './sodium.ts';
 import type { IssuerKeys } from './codes.ts';
 
@@ -82,12 +83,17 @@ export async function verifyClose(
     return signed.signature === null ? { ok: true, fallback: true } : { ok: false, reason: 'a fallback close must not carry a signature' };
   }
   if (!signed.signature) return { ok: false, reason: 'no signature' };
-  const s = await sodium();
+  // Verified with @noble/curves (plain JS, strict RFC 8032), so it runs in Workers as well as Node and browsers.
   let good = false;
   try {
-    good = s.crypto_sign_verify_detached(fromBase64(signed.signature), signedBytes(st), issuerPublicKey);
+    good = ed25519.verify(fromBase64(signed.signature), signedBytes(st), issuerPublicKey, { zip215: false });
   } catch {
     good = false;
   }
   return good ? { ok: true, fallback: false } : { ok: false, reason: 'the signature is not the issuer key’s' };
+}
+
+/** The public half of an X25519 count key, from its private half: proves a published private key is the right one. */
+export function countKeyPublicFromPrivate(privateKey: Uint8Array): Uint8Array {
+  return x25519.getPublicKey(privateKey);
 }

@@ -1,0 +1,31 @@
+# coded-ballot on Docker. Put it behind your reverse proxy with HTTPS: passkeys need a secure origin.
+# Secrets go in files next to this one (never in this file): setup_token.txt, smtp_pass.txt.
+services:
+  coded-ballot:
+    image: coded-ballot:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PUBLIC_ORIGIN: https://ballot.example.org
+      PROJECT_ORIGINS: ""            # the project's voting page origin, e.g. https://<owner>.github.io
+      VOTING_PAGE_URL: ""            # empty: links open this server's own /vote/ page
+      SETUP_TOKEN_FILE: /run/secrets/setup_token
+      SMTP_HOST: email-smtp.us-east-1.amazonaws.com
+      SMTP_PORT: "587"
+      SMTP_USER: ""
+      SMTP_PASS_FILE: /run/secrets/smtp_pass
+      MAIL_FROM: ballots@example.org
+    volumes:
+      - data:/data
+    secrets:
+      - setup_token
+      - smtp_pass
+volumes:
+  data:
+secrets:
+  setup_token:
+    file: ./setup_token.txt
+  smtp_pass:
+    file: ./smtp_pass.txt

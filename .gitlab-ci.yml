@@ -1,0 +1,15 @@
+# Tests both deployment targets: Node + SQLite, and Workers + D1 + R2 (under wrangler dev, locally).
+default:
+  image: node:24-bookworm
+
+stages: [test]
+
+test:
+  stage: test
+  cache:
+    key: { files: [package-lock.json] }
+    paths: [.npm/]
+  script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run typecheck
+    - npm test

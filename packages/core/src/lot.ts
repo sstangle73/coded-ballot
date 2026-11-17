@@ -63,3 +63,23 @@ export function drawLot(src: LotSource, label: string, items: string[]): LotDraw
   const order = [...items].sort((a, b) => (keys[a]! < keys[b]! ? -1 : keys[a]! > keys[b]! ? 1 : 0));
   return { round: src.round, label, items: [...items], keys, order };
 }
+
+export interface DrandRound {
+  round: number;
+  randomness: string;
+  signature: string;
+}
+
+/**
+ * The lot source for an election, checked: it must be the first round published after the close time, and its
+ * randomness must be the SHA-256 of its signature. The BLS signature itself is verified against DRAND_QUICKNET's
+ * public key by drand-client in the tellers' app before this is called. Anyone can repeat the whole check.
+ */
+export function lotForClose(beacon: DrandRound, closedAt: Date, chain: ChainTiming = DRAND_QUICKNET): LotSource {
+  const want = firstRoundAfter(Math.floor(closedAt.getTime() / 1000), chain);
+  if (beacon.round !== want) throw new Error(`ties must use drand round ${want}, the first after close; got ${beacon.round}`);
+  if (!randomnessMatchesSignature(beacon.randomness, beacon.signature)) {
+    throw new Error(`drand round ${beacon.round}: randomness does not match its signature`);
+  }
+  return { round: beacon.round, randomness: beacon.randomness.toLowerCase() };
+}

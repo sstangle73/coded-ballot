@@ -1,0 +1,33 @@
+{
+  "name": "@coded-ballot/server",
+  "version": "0.1.0",
+  "description": "coded-ballot server: one Hono app for Cloudflare Workers (D1, R2) and Node (SQLite, local disk)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build:worker": "node scripts/build-worker.ts",
+    "start": "node src/targets/node.ts",
+    "dev:worker": "wrangler dev"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261117.1",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@types/node": "^26.6.6",
+    "@types/nodemailer": "^8.0.2",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0",
+    "wrangler": "^4.163.0"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.8",
+    "@simplewebauthn/server": "^14.1.0",
+    "aws4fetch": "^1.0.20",
+    "hono": "^4.13.19",
+    "nodemailer": "^10.6.0",
+    "@coded-ballot/core": "0.1.0"
+  }
+}
