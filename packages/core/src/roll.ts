@@ -37,7 +37,8 @@ export function parseCsv(text: string): string[][] {
   let field = '';
   let i = 0;
   let quoted = false;
-  const t = text.replace(/^﻿/, '');
+  // A byte-order mark, or one a spreadsheet read as three Latin-1 letters and saved back as text.
+  const t = text.replace(/^(?:\u{feff}|\u{ef}\u{bb}\u{bf})/u, '');
   while (i < t.length) {
     const c = t[i]!;
     if (quoted) {

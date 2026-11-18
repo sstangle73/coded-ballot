@@ -25,7 +25,7 @@ import {
 } from '@coded-ballot/core';
 import { freezeRollCsv, makePacket, reissue, styleOf, type IssuedState, type PacketInfo } from '@coded-ballot/issuer';
 import { Api, serverFromFragment } from '../shared/api.ts';
-import { rollEditor, rowsFromCsv, templateLink, type Row } from './roll-editor.ts';
+import { decodeRoll, rollEditor, rowsFromCsv, templateLink, type Row } from './roll-editor.ts';
 import { $, fragmentParams, h, show, status } from '../shared/ui.ts';
 import type { ElectionInfo, Staff } from '../teller/teller.ts';
 
@@ -286,7 +286,7 @@ function rollSection(s: State) {
   input.addEventListener('change', async () => {
     const f = input.files?.[0];
     if (!f) return;
-    const text = await f.text();
+    const text = decodeRoll(new Uint8Array(await f.arrayBuffer()));
     const { frozen, problems } = freezeRollCsv(s.info.rules, text);
     if (problems.length) {
       s.frozen = null;

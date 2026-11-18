@@ -27,8 +27,6 @@ const LABELS: Record<string, [string, string]> = {
 
 const YES = /^(1|y|yes|true)$/i;
 const NO = /^(|0|n|no|false)$/i;
-/** Spreadsheets read a UTF-8 file's accented names right only after a byte-order mark; the importer ignores it. */
-const BOM = String.fromCharCode(0xfeff);
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NUMBER = /^\d+(\.\d{1,4})?$/;
 
@@ -56,9 +54,9 @@ function cell(v: string): string {
   return /[",\r\n]|^\s|\s$/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
 }
 
-/** RFC 4180, with a byte-order mark so spreadsheets read accented names right (the importer ignores it). */
+/** RFC 4180, UTF-8 with no byte-order mark: Google Sheets shows one as three stray letters. */
 export function toCsv(columns: string[], rows: Row[]): string {
-  return BOM + [columns, ...rows.map((r) => columns.map((c) => r[c] ?? ''))].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
+  return [columns, ...rows.map((r) => columns.map((c) => r[c] ?? ''))].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';
 }
 
 export function templateCsv(rules: Rules): string {
@@ -339,4 +337,13 @@ export function rollEditor(o: EditorOptions): HTMLElement {
   }
   draw();
   return root;
+}
+
+/** A roll file's text. Excel's plain "CSV" saves in Windows-1252, not UTF-8, so a file that isn't UTF-8 is read as that. */
+export function decodeRoll(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes);
+  }
 }
