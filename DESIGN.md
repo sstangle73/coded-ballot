@@ -35,6 +35,7 @@ Roles are an election setting:
   - A link can name any server, and a fake one could show the real election and ask for a signed close. So the page shows the server's address and asks the issuer to confirm it is their organisation's before anything else.
   - The server allows CORS from `PROJECT_ORIGINS` for the bearer header, never with credentials; staff actions with a cookie must still come from the server's own origin.
   - The issuer page keeps no file: it finds each member's current copy by deriving their code hashes and looking them up in the server's list of hashes (which carries no state, so it doesn't say who has voted). It checks the roll file against the roll fingerprint the server froze, and the passphrase against the published signing key.
+  - The roll is typed in on the issuer page, not in the tellers' app, because names and addresses must not reach the organisation's server (2026-11-17). The page saves it as the roll file for the issuer to keep, since it keeps no copy, and offers a blank file with this election's columns for anyone using a spreadsheet. A file with mistakes opens in the same editor, each problem in plain words. Once the server has the roll's fingerprint, the roll can't change.
   - The copy of the issuer page on an organisation's own server refuses to run (except on `localhost`, for testing).
 - **The ballot sheet:**
   - shows a QR code (election, style, S, page) and a typed code, and never the member's name

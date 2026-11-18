@@ -25,6 +25,7 @@ import {
 } from '@coded-ballot/core';
 import { freezeRollCsv, makePacket, reissue, styleOf, type IssuedState, type PacketInfo } from '@coded-ballot/issuer';
 import { Api, serverFromFragment } from '../shared/api.ts';
+import { rollEditor, rowsFromCsv, templateLink, type Row } from './roll-editor.ts';
 import { $, fragmentParams, h, show, status } from '../shared/ui.ts';
 import type { ElectionInfo, Staff } from '../teller/teller.ts';
 
@@ -39,6 +40,8 @@ interface State {
   madeHere: boolean;
   frozen: FrozenRoll | null;
   rollFileName: string;
+  /** The members being typed in, while the roll editor is open. */
+  rollEditor: HTMLElement | null;
   /** Every code hash the server holds for this election, and the roll it froze. */
   hashes: Set<string>;
   rollSha256: string | null;
@@ -97,6 +100,7 @@ async function start() {
       madeHere: false,
       frozen: null,
       rollFileName: '',
+      rollEditor: null,
       hashes: new Set(codes.hashes),
       rollSha256: codes.rollSha256,
       fingerprintChecked: false,
@@ -250,19 +254,50 @@ function signOutButton(s: State) {
 
 // ---------- 1. the roll ----------
 
+function openEditor(s: State, columns?: string[], rows?: Row[], fileName?: string) {
+  s.rollEditor = rollEditor({
+    rules: s.info.rules,
+    columns,
+    rows,
+    fileName: fileName?.replace(/(\.csv)?$/i, '.csv'),
+    use: (csv, name) => {
+      const { frozen, problems } = freezeRollCsv(s.info.rules, csv);
+      if (problems.length) return note(s, 'roll', status('bad', problems.join(' ')));
+      s.frozen = frozen;
+      s.rollFileName = name;
+      s.rollEditor = null;
+      s.notes.roll = [status('ok', `Saved ${name} to your downloads. Keep it, unchanged: replacing a ballot or signing the close needs this same file.`)];
+      render(s);
+    },
+    cancel: () => {
+      s.rollEditor = null;
+      render(s);
+    },
+  });
+  s.notes.roll = [];
+  render(s);
+  s.rollEditor.querySelector<HTMLElement>('input:not([type=hidden])')?.focus();
+}
+
 function rollSection(s: State) {
+  if (s.rollEditor) return section(s, 'roll', 'The membership roll', s.rollEditor);
+  const canEdit = !s.rollSha256;
   const input = h('input', { id: 'roll-file', type: 'file', accept: '.csv,text/csv' });
   input.addEventListener('change', async () => {
     const f = input.files?.[0];
     if (!f) return;
-    const { frozen, problems } = freezeRollCsv(s.info.rules, await f.text());
+    const text = await f.text();
+    const { frozen, problems } = freezeRollCsv(s.info.rules, text);
     if (problems.length) {
       s.frozen = null;
       return note(
         s,
         'roll',
-        status('bad', `${problems.length} row${problems.length === 1 ? '' : 's'} in ${f.name} need fixing. Fix them in the file, then choose it again.`),
+        status('bad', `${problems.length} row${problems.length === 1 ? '' : 's'} in ${f.name} need fixing.`),
         h('ul', {}, ...problems.slice(0, 50).map((p) => h('li', {}, p))),
+        canEdit
+          ? h('p', {}, h('button', { onclick: () => { const { columns, rows } = rowsFromCsv(text); openEditor(s, columns, rows, f.name); } }, 'Fix them here'), ' or fix them in the file and choose it again.')
+          : h('p', {}, 'Fix them in the file, then choose it again.'),
       );
     }
     if (s.rollSha256 && frozen.sha256 !== s.rollSha256) {
@@ -274,20 +309,41 @@ function rollSection(s: State) {
     s.notes.roll = [];
     render(s);
   });
+  const fromFrozen = () => {
+    const members = s.frozen!.members;
+    const columns = [...new Set(members.flatMap((m) => Object.keys(m.fields)))];
+    openEditor(s, columns, members.map((m) => ({ ...m.fields })), s.rollFileName);
+  };
+  if (s.frozen) {
+    return section(
+      s,
+      'roll',
+      'The membership roll',
+      status('ok', `${s.rollFileName}: ${s.frozen.members.length} members${s.rollSha256 ? ', the same roll as before' : ''}. Roll fingerprint ${s.frozen.sha256.slice(0, 16)}…`),
+      canEdit ? h('p', {}, h('button', { class: 'secondary', onclick: fromFrozen }, 'Add or change members')) : null,
+      h('label', { for: 'roll-file' }, 'Choose a different file'),
+      input,
+    );
+  }
+  if (!canEdit) {
+    return section(
+      s,
+      'roll',
+      'The membership roll',
+      h('p', {}, 'Choose the roll file you froze for this election. It stays on this computer; it’s needed for members’ names and addresses.'),
+      h('label', { for: 'roll-file' }, 'Roll file'),
+      input,
+    );
+  }
   return section(
     s,
     'roll',
     'The membership roll',
-    s.frozen
-      ? status('ok', `${s.rollFileName}: ${s.frozen.members.length} members${s.rollSha256 ? ', the same roll as before' : ''}. Roll fingerprint ${s.frozen.sha256.slice(0, 16)}…`)
-      : h(
-          'p',
-          {},
-          s.rollSha256
-            ? 'Choose the roll file you froze for this election. It stays on this computer; it’s needed for members’ names and addresses.'
-            : 'Choose the membership roll, as a CSV file with member_id and class columns (and name, email and address columns). It stays on this computer: the server gets only member IDs and emails.',
-        ),
-    h('label', { for: 'roll-file' }, s.frozen ? 'Choose a different file' : 'Roll file'),
+    h('p', {}, 'The roll lists everyone who can vote. It stays on this computer: the server gets only member IDs and emails.'),
+    h('p', {}, h('button', { onclick: () => openEditor(s) }, 'Type in the members')),
+    h('h3', {}, 'Or use a spreadsheet'),
+    templateLink(s.info.rules),
+    h('label', { for: 'roll-file' }, 'Choose the roll file (CSV)'),
     input,
   );
 }

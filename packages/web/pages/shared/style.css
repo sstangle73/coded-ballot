@@ -67,3 +67,11 @@ input[type=file] { border: 0; padding: 0.4rem 0; }
   .printable, .printable * { visibility: visible; color: #000 !important; background: #fff !important; }
   .printable { position: absolute; left: 0; top: 0; border: 0; }
 }
+/* the roll editor on the issuer page */
+.members { list-style: none; padding: 0; margin: 0.5rem 0; }
+.members .member { border-top: 1px solid var(--line); padding: 0.5rem 0; max-width: none; }
+.members .member .status { margin: 0.4rem 0; padding: 0.4rem 0.7rem; }
+.members .member button { margin: 0.4rem 0.5rem 0 0; padding: 0.4rem 0.9rem; }
+p.hint { margin: 0 0 0.3rem; }
+dl dt { margin-top: 0.5rem; } dl dd { margin-left: 1rem; }
+input[type=search] { font: inherit; padding: 0.55rem 0.7rem; border: 2px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); width: 100%; max-width: 26rem; }
