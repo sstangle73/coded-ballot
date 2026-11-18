@@ -18,10 +18,12 @@ export function createApp(d: Deps) {
     await next();
   });
   app.use('*', secureHeaders({ referrerPolicy: 'no-referrer', crossOriginResourcePolicy: false }));
-  // Public and voting routes: the project's own voting page and checker may call these from their origin.
+  // The project's own site may call the API from its origin: the voting page and checker (public routes), and the
+  // issuer page (staff routes, with a bearer token handed over in the link's # part). No credentials: cookies stay
+  // with this server's own pages, and staff actions with a cookie must come from this origin (requireRole).
   app.use(
-    '/api/public/*',
-    cors({ origin: [d.config.publicOrigin, ...d.config.projectOrigins], allowMethods: ['GET', 'POST'], allowHeaders: ['content-type'], maxAge: 600 }),
+    '/api/*',
+    cors({ origin: [d.config.publicOrigin, ...d.config.projectOrigins], allowMethods: ['GET', 'POST'], allowHeaders: ['content-type', 'authorization'], maxAge: 600 }),
   );
   app.use('/api/*', loadStaff);
   app.onError((err, c) => {

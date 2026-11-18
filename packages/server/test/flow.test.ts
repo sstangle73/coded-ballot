@@ -126,6 +126,26 @@ describe('a whole election', () => {
     expect(bad.status).toBe(401);
   });
 
+  it('lets the issuer page on the project site use its token from there, and sign only itself out', async () => {
+    const pre = (origin: string) =>
+      app.request(`/api/staff/e/${E}/codes`, { method: 'OPTIONS', headers: { origin, 'access-control-request-method': 'POST', 'access-control-request-headers': 'authorization,content-type' } });
+    const ok = await pre('https://project.test');
+    expect(ok.headers.get('access-control-allow-origin')).toBe('https://project.test');
+    expect(ok.headers.get('access-control-allow-headers')).toMatch(/authorization/);
+    expect(ok.headers.get('access-control-allow-credentials')).toBeNull();
+    expect((await pre('https://evil.test')).headers.get('access-control-allow-origin')).toBeNull();
+    const a = (await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: {} })).json.token as string;
+    const b = (await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: {} })).json.token as string;
+    const me = (t: string) => app.request('/api/auth/me', { headers: { authorization: `Bearer ${t}`, origin: 'https://project.test' } });
+    expect((await me(a)).headers.get('access-control-allow-origin')).toBe('https://project.test');
+    // sent with the cookie too, as a same-origin page might: only the token ends
+    const out = await app.request('/api/auth/logout', { method: 'POST', headers: { authorization: `Bearer ${a}`, cookie: issuerCookie, origin: 'https://project.test', 'content-type': 'application/json' }, body: '{}' });
+    expect(out.status).toBe(200);
+    expect((await me(a)).status).toBe(401);
+    expect((await me(b)).status).toBe(200); // the other token, and the passkey session, carry on
+    expect((await call('GET', '/api/auth/me', { cookie: issuerCookie })).json.staff).not.toBeNull();
+  });
+
   it('refuses staff actions from another origin', async () => {
     const r = await call('POST', '/api/staff/elections', { cookie: issuerCookie, origin: 'https://evil.test', body: { rulesYaml: RULES } });
     expect(r.status).toBe(403);
@@ -150,6 +170,14 @@ describe('a whole election', () => {
     const codes = members.map((m) => ({ hash: hash(m), styleId: 'full' }));
     const up = await call('POST', `/api/staff/e/${E}/codes`, { cookie: issuerCookie, body: { issuerPublicKey: toBase64(keys.signPublicKey), codes } });
     expect(up.json).toEqual({ issued: 8 });
+    // the issuer page finds each member's copy from these: hashes only, never which were used
+    const tok = (await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: {} })).json.token as string;
+    const hs = await app.request(`/api/staff/e/${E}/codes/hashes`, { headers: { authorization: `Bearer ${tok}` } });
+    const hj = (await hs.json()) as { hashes: string[]; rollSha256: string };
+    expect(hj.hashes).toEqual(codes.map((c) => c.hash).sort());
+    expect(hj.rollSha256).toBe('a'.repeat(64));
+    expect(JSON.stringify(hj)).not.toMatch(/issued|spent|revoked/);
+    expect((await call('GET', `/api/staff/e/${E}/codes/hashes`, { cookie: tellerCookie })).status).toBe(403);
     expect((await call('POST', `/api/staff/e/${E}/passphrase-backup`, { cookie: issuerCookie })).status).toBe(200);
     // separated mode: the issuer can't hold the count key
     expect((await call('POST', `/api/staff/e/${E}/count-key`, { cookie: issuerCookie, body: { publicKey: toBase64(countKey.publicKey) } })).status).toBe(403);

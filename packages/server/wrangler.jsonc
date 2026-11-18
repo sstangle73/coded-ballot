@@ -20,7 +20,8 @@
   "vars": {
     "PUBLIC_ORIGIN": "https://coded-ballot.example.workers.dev",
     "RP_NAME": "coded-ballot",
-    "PROJECT_ORIGINS": "",
+    // the project site: its issuer page, voting page and checker
+    "PROJECT_ORIGINS": "https://sstangle73.github.io",
     "MAIL_FROM": "",
     "SES_REGION": "us-east-1"
   }

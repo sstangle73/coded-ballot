@@ -17,10 +17,11 @@ Check before you use it. This project gives no legal advice and makes no legal c
 ## How an election runs
 
 1. **Set-up.** The issuer writes a rules file (dates, channels, who votes on what, the counting method for each
-   contest), freezes the roll, and makes a 12-word passphrase with the issuer tool. A teller makes the count key on
-   their own device; only its public half goes to the server.
-2. **Ballots.** The issuer tool prints a packet for each member: a cover letter with their address, and ballot sheets
-   with a QR code and a typed code but no name. Packets can be printed at home, emailed, or sent through Lob.
+   contest) and creates the election from it in the tellers' app. On the issuer page they freeze the roll and make a
+   12-word passphrase. A teller makes the count key on their own device; only its public half goes to the server.
+2. **Ballots.** The issuer page makes a packet for each member: a cover letter with their address, and ballot sheets
+   with a QR code and a typed code but no name. Packets can be printed at home or emailed one at a time; the
+   command-line issuer tool also emails everyone or sends the packets through Lob.
 3. **Voting.** A member votes once, any one way:
    - **by post:** the folded ballot is scanned on arrival by its QR code, without being opened;
    - **online:** a link sent to the member's email plus the code on their ballot. The vote is locked in their browser
@@ -44,8 +45,8 @@ The design is in [DESIGN.md](DESIGN.md), with diagrams in [docs/design.html](doc
 | --- | --- |
 | [`packages/core`](packages/core) | The TypeScript core every part shares: rules and their schema, the roll, ballot styles, codes, the signed close, the spend list, ballot layout, sealing votes, reading marks from images, and the counting modules (plurality, approval, yes/no with any threshold, IRV, Scottish STV, all with weights) with plain-language explanations. |
 | [`packages/server`](packages/server) | One server app, two ways to run it: Cloudflare Workers (D1, R2) or Docker (Node, SQLite, a folder on disk). |
-| [`packages/issuer`](packages/issuer) | The issuer tool, run on the issuer's own computer: passphrase, roll, codes, printable packets, Lob, reissues, the signed close. |
-| [`packages/web`](packages/web) | The pages: the voting page, the tellers' app (an installable web app), the public page with the ballot tracker, and the member checker. |
+| [`packages/issuer`](packages/issuer) | The issuer's work: passphrase, roll, codes, printable packets, reissues, the signed close. The issuer page runs it in the browser; its command-line tool, on the issuer's own computer, adds emailing everyone and Lob. |
+| [`packages/web`](packages/web) | The pages: the voting page, the tellers' app (an installable web app), the issuer page, the public page with the ballot tracker, and the member checker. |
 
 ## Try it
 
@@ -105,7 +106,7 @@ docker compose exec coded-ballot setup-link
 | Variable | Meaning |
 | --- | --- |
 | `PUBLIC_ORIGIN` | The server's own address, like `https://ballot.example.org`. Passkeys are tied to it. |
-| `PROJECT_ORIGINS` | Comma-separated origins allowed to call the public API: the project site's voting page and member checker. |
+| `PROJECT_ORIGINS` | Comma-separated origins allowed to call the API from the project site: its voting page, member checker and issuer page. For this project's site, `https://sstangle73.github.io`. Without it the issuer page can't reach the server. |
 | `VOTING_PAGE_URL` | Where voting links point. Empty means this server's own `/vote/` page. |
 | `SETUP_TOKEN` (or `SETUP_TOKEN_FILE`) | Optional on Docker: the one-time token in the setup link. Without it, Docker makes one and keeps it in the data folder until someone has set the server up. On Workers, `npm run setup-link` sets it. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (or `_FILE`), `MAIL_FROM` | Mail on Docker. |
@@ -120,16 +121,24 @@ docker compose exec coded-ballot setup-link
    email and make a passkey (their fingerprint, face or screen lock; no password). They are then the issuer and a
    teller, and invite the other tellers from the same page. (With only the token, "First time on this server? Set it
    up" on `/teller/` takes it typed in.)
-2. In the tellers' app, signed in as the issuer, make a tool token for the issuer tool. On the issuer's own computer,
-   run the issuer tool: `npx coded-ballot-issuer --help`.
+2. In the tellers' app, the issuer creates the election from its rules file (start from
+   [`examples/rules.example.yaml`](examples/rules.example.yaml)), then opens it and chooses **Issue ballots**. That opens
+   the issuer page on the project site, signed in for 12 hours, where they choose the roll, make the passphrase and
+   make the ballots. To email every member or post through Lob, make a token under *Make a token for the command-line
+   issuer tool* and run `npx coded-ballot-issuer --help` on the issuer's own computer.
 
 ## The project site
 
-The project's own copy of the voting page and the member checker are published on GitHub Pages from the GitHub mirror
-by [`.github/workflows/pages.yml`](.github/workflows/pages.yml), with `release-hashes.json`: the SHA-256 of every
-file. Members can vote from that copy, which only ever locks their vote with the count key printed on their ballot, or
-use the checker to compare their organisation's voting page with the release. Organisations list the project site in
-`PROJECT_ORIGINS`.
+The project's own copy of the pages is published at <https://sstangle73.github.io/coded-ballot/> on GitHub Pages from
+the [GitHub mirror](https://github.com/sstangle73/coded-ballot) by
+[`.github/workflows/pages.yml`](.github/workflows/pages.yml), with `release-hashes.json`: the SHA-256 of every file.
+- **The issuer page** runs only from there. The passphrase and the codes are made in the issuer's browser, from code
+  the organisation's server doesn't serve and can't change; the copy on the organisation's own server refuses to run.
+  The tellers' app opens it with the server's address and a 12-hour token after the `#`, which never reaches GitHub.
+- **Members** can vote from the project's copy of the voting page, which only ever locks their vote with the count key
+  printed on their ballot, or use the checker to compare their organisation's voting page with the release.
+
+Organisations list the project site's origin in `PROJECT_ORIGINS`.
 
 ## Accessibility
 

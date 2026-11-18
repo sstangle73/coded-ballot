@@ -39,8 +39,8 @@ it breaks one of those promises without the trust TRUST.md already assumes:
 - **Integrity of the count:** a locked vote changed, added or dropped without the signed close catching it; the
   voting page sealing to a key other than the one whose fingerprint it shows; a count, tie draw or recount that
   differs from the rules; certification despite a hand count that doesn't match.
-- **Staff access:** reaching staff routes without a passkey session or a tool token, a tool token doing more than the
-  issuer tool needs, inviting someone into a role the inviter doesn't hold, or locked votes released before a valid
+- **Staff access:** reaching staff routes without a passkey session or a token, a token for the issuer page or tool
+  doing more than the issuer needs, inviting someone into a role the inviter doesn't hold, or locked votes released before a valid
   close.
 - **The pages:** script injection, a way round the content security policy, or the member checker passing a changed
   voting page.

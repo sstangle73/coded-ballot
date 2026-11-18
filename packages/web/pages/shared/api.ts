@@ -1,9 +1,12 @@
 // The organisation's server. Its address comes from the link's # part (never sent to any server), or this page's
-// own origin when the page is served by the organisation's server itself.
+// own origin when the page is served by the organisation's server itself. The issuer page on the project's site
+// signs in with a bearer token from its link instead of a cookie.
 export class Api {
   readonly base: string;
-  constructor(base: string) {
+  private readonly token?: string;
+  constructor(base: string, token?: string) {
     this.base = base.replace(/\/$/, '');
+    this.token = token;
   }
   async get<T = any>(path: string): Promise<T> {
     return this.req<T>('GET', path);
@@ -12,7 +15,9 @@ export class Api {
     return this.req<T>('POST', path, body);
   }
   async req<T>(method: string, path: string, body?: unknown, raw?: { data: Blob | Uint8Array; type: string }): Promise<T> {
-    const init: RequestInit = { method, credentials: this.base === location.origin ? 'same-origin' : 'omit', headers: {} };
+    // a token stands alone: no cookie goes with it, even when this page shares the server's origin
+    const init: RequestInit = { method, credentials: this.base === location.origin && !this.token ? 'same-origin' : 'omit', headers: {} };
+    if (this.token) (init.headers as Record<string, string>).authorization = `Bearer ${this.token}`;
     if (raw) {
       (init.headers as Record<string, string>)['content-type'] = raw.type;
       init.body = raw.data as BodyInit;

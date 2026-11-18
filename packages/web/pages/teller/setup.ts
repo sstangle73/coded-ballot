@@ -10,19 +10,45 @@ const grouped = (s: string) => s.match(/.{1,4}/g)!.join(' ');
 export function setupView(ctx: Ctx, info: ElectionInfo): HTMLElement {
   const isTeller = ctx.staff.roles.includes('teller');
   const parts: (Node | null)[] = [];
+  if (ctx.staff.roles.includes('issuer')) parts.push(rulesFile(ctx, info));
   if (info.channels.online) {
     parts.push(h('h3', {}, 'The count key'));
     if (!info.countKey) parts.push(isTeller ? makeKey(ctx, info) : status('info', 'A teller must make the count key before voting can open.'));
     else {
       parts.push(
         h('p', {}, 'Count key fingerprint, to print on every ballot: ', h('span', { class: 'fingerprint' }, info.countKey.fingerprint)),
-        h('p', { class: 'small' }, 'If you made this key, read this fingerprint to the issuer from your own copy. The issuer tool asks them to check it with you before printing ballots.'),
+        h('p', { class: 'small' }, 'If you made this key, read this fingerprint to the issuer from your own copy. The issuer page asks them to check it with you before printing ballots.'),
       );
       if (isTeller) parts.push(confirmCopy(ctx, info));
     }
   }
   parts.push(h('h3', {}, 'Open voting'), openButton(ctx, info));
   return h('div', {}, ...parts);
+}
+
+/** Until voting opens, the issuer may replace the rules file (same election ID). */
+function rulesFile(ctx: Ctx, info: ElectionInfo): HTMLElement {
+  const file = h('input', { id: 'rules-replace', type: 'file', accept: '.yaml,.yml,text/yaml' });
+  const msg = h('div', {});
+  file.addEventListener('change', async () => {
+    const f = file.files?.[0];
+    if (!f) return;
+    try {
+      await ctx.api.req('PUT', `/api/staff/e/${encodeURIComponent(info.id)}/rules`, { rulesYaml: await f.text() });
+      ctx.reload();
+    } catch (e) {
+      msg.replaceChildren(status('bad', (e as Error).message));
+    }
+  });
+  return h(
+    'details',
+    {},
+    h('summary', {}, 'The rules file'),
+    h('p', { class: 'small' }, `Rules SHA-256 ${info.rulesSha256}. Until voting opens you can replace it with a corrected file for the same election. Do it before printing ballots: printed ballots keep the old wording.`),
+    h('label', { for: 'rules-replace' }, 'Replace the rules file'),
+    file,
+    msg,
+  );
 }
 
 function makeKey(ctx: Ctx, info: ElectionInfo): HTMLElement {

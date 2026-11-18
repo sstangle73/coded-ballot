@@ -230,7 +230,8 @@ async function home(staff: Staff) {
             ),
           ),
         )
-      : h('p', {}, staff.roles.includes('issuer') ? 'No elections yet. Create one with the issuer tool: coded-ballot check-rules, then upload.' : 'No elections yet.'),
+      : h('p', {}, staff.roles.includes('issuer') ? 'No elections yet. Create one from its rules file below.' : 'No elections yet.'),
+    staff.roles.includes('issuer') ? newElection(ctx) : null,
     staff.roles.includes('issuer') ? toolToken() : null,
     inviteForm(ctx),
   );
@@ -258,14 +259,78 @@ function signedInBar(ctx: Ctx) {
   );
 }
 
-/** A 12-hour token for the issuer tool on the issuer's own computer. Shown once; signing out ends it. */
+/** A new election from its rules file (YAML). */
+function newElection(ctx: Ctx): HTMLElement {
+  const file = h('input', { id: 'rules-file', type: 'file', accept: '.yaml,.yml,text/yaml' });
+  const msg = h('div', {});
+  file.addEventListener('change', async () => {
+    const f = file.files?.[0];
+    if (!f) return;
+    try {
+      const r = await api.post<{ id: string }>('/api/staff/elections', { rulesYaml: await f.text() });
+      election(ctx, r.id);
+    } catch (e) {
+      msg.replaceChildren(status('bad', (e as Error).message));
+    }
+  });
+  return h(
+    'details',
+    {},
+    h('summary', {}, 'Create an election'),
+    h('p', { class: 'small' }, 'Choose the election’s rules file. It says who may vote, what’s on the ballot, how it’s counted and the dates. Start from examples/rules.example.yaml in the project.'),
+    h('label', { for: 'rules-file' }, 'Rules file'),
+    file,
+    msg,
+  );
+}
+
+/** The issuer page lives on the project's own site; this server's copy refuses to run. Local test servers use their own. */
+export function issuerPageUrl(): string {
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  return local ? `${location.origin}/issue/` : new URL('issue/', __PROJECT_SITE__).href;
+}
+
+/** Opens the issuer page on the project's site, signed in with a 12-hour token handed over after the #. */
+function issueButton(ctx: Ctx, info: ElectionInfo): HTMLElement {
+  const msg = h('div', {});
+  const page = new URL(issuerPageUrl());
+  return h(
+    'div',
+    { class: 'panel' },
+    h('h3', {}, 'Ballots'),
+    h('p', {}, 'Make and print ballots, replace a lost one, and sign the close on the issuer page. It comes from the coded-ballot project’s own site, not this server, so this server never sees your passphrase or the codes.'),
+    h(
+      'p',
+      {},
+      h(
+        'button',
+        {
+          onclick: async () => {
+            try {
+              const r = await ctx.api.post<{ token: string }>('/api/auth/tokens', { label: 'issuer page' });
+              // the same tab, so no pop-up blocker gets in the way; the issuer page links back here
+              location.assign(`${page.href}#${new URLSearchParams({ s: location.origin, e: info.id, t: r.token })}`);
+            } catch (e) {
+              msg.replaceChildren(status('bad', (e as Error).message));
+            }
+          },
+        },
+        'Issue ballots',
+      ),
+    ),
+    h('p', { class: 'small' }, `Its address starts ${page.origin}${page.pathname}. If it doesn’t, don’t type your passphrase there.`),
+    msg,
+  );
+}
+
+/** A 12-hour token for the command-line issuer tool, for emailing everyone or posting through Lob. */
 function toolToken(): HTMLElement {
   const out = h('div', {});
   return h(
     'details',
     {},
-    h('summary', {}, 'Make a token for the issuer tool'),
-    h('p', { class: 'small' }, 'The issuer tool on your own computer uses it to upload the roll and code hashes and to sign the close. It lasts 12 hours, and signing out here ends it.'),
+    h('summary', {}, 'Make a token for the command-line issuer tool'),
+    h('p', { class: 'small' }, 'Most issuers never need this: the Issue ballots button on each election does the work in the browser. The command-line tool on your own computer is for emailing every member their ballot, or posting through Lob. The token lasts 12 hours, and signing out here ends it.'),
     h(
       'button',
       {
@@ -335,7 +400,8 @@ export async function election(ctx: Ctx, id: string) {
     return show(app, status('bad', (e as Error).message));
   }
   const back = h('p', {}, h('a', { href: '#', onclick: (e: Event) => (e.preventDefault(), history.replaceState(null, '', location.pathname), ctx.home()) }, '← All elections'));
-  const head = [signedInBar(ctx), back, h('h2', {}, info.title), h('p', { class: 'sub' }, `${info.organisation}. ${STATUS_LABEL[info.status]}.`)];
+  const head: HTMLElement[] = [signedInBar(ctx), back, h('h2', {}, info.title), h('p', { class: 'sub' }, `${info.organisation}. ${STATUS_LABEL[info.status]}.`)];
+  if (ctx.staff.roles.includes('issuer') && ['setup', 'open', 'closed'].includes(info.status)) head.push(issueButton(c, info));
   const body =
     info.status === 'setup'
       ? setupView(c, info)

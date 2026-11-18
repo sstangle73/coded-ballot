@@ -1,10 +1,14 @@
 {
   "name": "@coded-ballot/issuer",
   "version": "0.1.0",
-  "description": "coded-ballot issuer tool: runs on the issuer's own computer, never from the public server",
+  "description": "coded-ballot issuer: the passphrase, codes and printable packets, for the issuer page on the project's site and the command-line tool; never run from an organisation's server",
   "license": "AGPL-3.0-only",
   "type": "module",
   "private": true,
+  "main": "./src/issuer.ts",
+  "exports": {
+    ".": "./src/issuer.ts"
+  },
   "bin": {
     "coded-ballot-issuer": "src/cli.ts"
   },

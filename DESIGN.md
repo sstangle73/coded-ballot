@@ -24,13 +24,17 @@ Roles are an election setting:
 ## 2. Codes and ballots
 
 - **Code derivation:**
-  - The issuer tool generates the passphrase: 12 BIP39 words (128 bits plus a checksum that catches a mistyped word). The issuer never makes one up.
+  - The issuer page (or the command-line issuer tool) generates the passphrase: 12 BIP39 words (128 bits plus a checksum that catches a mistyped word). The issuer never makes one up.
   - `master = Argon2id(passphrase, salt from the election ID)` (libsodium), so guessing it is slow as well as hopeless.
   - `K = HKDF(master)`, with separate labels for the code key and the signing key (Ed25519).
   - `S = HMAC(K_code, election ‖ member_id ‖ n)`, with each field length-prefixed, cut to 80 bits, where `n` is the issue number (copy 1, 2, ...).
   - The typed code is 16 Crockford base32 characters in groups of four plus a check character, e.g. `Y6VY-PMD5-R82Z-EKPW-V`.
   - No member-to-code list is ever stored.
-- **Generation:** codes are generated in the issuer's tool, which runs **locally** (Docker or a signed release), never from pages served by the public server. The server receives only `hash(S)` and the ballot style for each code.
+- **Generation:** codes are generated in the issuer's own browser, on the **issuer page served from the project site** (or by the command-line issuer tool on the issuer's computer), never from pages served by the organisation's server. The server receives only `hash(S)` and the ballot style for each code.
+  - The tellers' app opens the issuer page with `#s=<server>&e=<election>&t=<token>`: a 12-hour token that works only for the issuer's routes, never sent to the project site, and dropped from the address bar at once. Signing out on the page ends that token; signing out of the tellers' app ends them all.
+  - The server allows CORS from `PROJECT_ORIGINS` for the bearer header, never with credentials; staff actions with a cookie must still come from the server's own origin.
+  - The issuer page keeps no file: it finds each member's current copy by deriving their code hashes and looking them up in the server's list of hashes (which carries no state, so it doesn't say who has voted). It checks the roll file against the roll fingerprint the server froze, and the passphrase against the published signing key.
+  - The copy of the issuer page on an organisation's own server refuses to run (except on `localhost`, for testing).
 - **The ballot sheet:**
   - shows a QR code (election, style, S, page) and a typed code, and never the member's name
   - has four corner fiducials and large ovals, or a rank grid for ranked contests
@@ -156,7 +160,7 @@ Voting and teller pages meet WCAG 2.1 AA, with a large-print ballot style and on
 **First version:**
 - roll import (CSV) with classes, frozen at the notice date
 - the rules file and the five counting modules
-- the local issuer tool (codes, PDFs, email, mail API adapter, reissue, signed close)
+- the issuer page on the project site, and the local issuer tool (codes, PDFs, email, mail API adapter, reissue, signed close)
 - online voting (email link and code), the count key, and the opt-in time-lock
 - the project-hosted and downloadable voting page
 - the teller PWA (receipt scan, count scan, adjudication, hand-count entry, count-key unlock)
@@ -193,10 +197,11 @@ Still open:
 - **Codes:** 80 bits, 16 characters plus a check character (section 2).
 - **STV:** Scottish rules (section 6).
 - **Project site:** the project-hosted voting page and member checker are published on GitHub Pages from the GitHub mirror, built by CI from tagged source with the SHA-256 of every file alongside. Nothing is published until the maintainer decides to.
+- **Issuer page (2026-11-17):** the issuer's work moved from a command-line tool to a page on the project site, opened from the tellers' app, so an issuer needs no install and no token to copy. The command-line tool stays for bulk email and Lob: Lob's API doesn't allow calls from a browser, and an organisation's server can't send ballots by email without seeing the codes.
 - **Sign-in for tellers and the issuer:** passkeys (WebAuthn) on both targets, enrolled by a one-time email link. Cloudflare Access can sit in front as an extra layer.
 - **Email:** any SMTP server on Docker; on Workers, a provider's HTTPS API. Tested with Amazon SES.
 - **Mail API:** Lob first, for Lob's test mode; a PostGrid adapter can follow.
-- **Count key fingerprint:** the voting page and the issuer tool work it out from the public key itself, never from the fingerprint the server reports, and the issuer confirms it with the teller who made the key before printing ballots.
+- **Count key fingerprint:** the voting page, the issuer page and the issuer tool work it out from the public key itself, never from the fingerprint the server reports, and the issuer confirms it with the teller who made the key before printing ballots.
 - **Mark reading:** in TypeScript in the core, without OpenCV: four corner squares, a perspective map, and each oval judged against the paper just around it. A mark must be dark across the whole oval (70% overall and 45% in every quarter); crosses, ticks, write-ins, overvotes and rank-grid mistakes always go to a teller. Real-paper tests: [docs/scanning-tests.md](docs/scanning-tests.md).
 - **Which paper counts:** before reading paper, the tellers' app downloads every code received by post or in person with its ballot style, once, and checks each sheet against that list on the teller's device. A sheet never received, voted online, or carrying the wrong style can't be counted, and the server never learns which code a cast vote record came from.
 - **Ballot images** are re-saved as JPEG in the tellers' app before upload, which drops photo metadata such as location.

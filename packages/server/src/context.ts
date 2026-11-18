@@ -38,7 +38,8 @@ export interface Staff {
   roles: Role[];
 }
 
-export type Env = { Variables: { deps: Deps; staff?: Staff; bearer?: boolean } };
+/** `bearer` is the hash of the bearer token this request came with, if any. */
+export type Env = { Variables: { deps: Deps; staff?: Staff; bearer?: string } };
 export type C = Context<Env>;
 
 export function deps(c: C): Deps {

@@ -180,6 +180,18 @@ staff.post('/e/:id/codes', issuerTool, async (c) => {
   return c.json({ issued: codes.length });
 });
 
+/**
+ * Every code hash for this election, without its state: the issuer page finds each member's current copy by deriving
+ * their hashes from the passphrase, so it needs no file of its own. The state stays out: it would tell the issuer
+ * who has voted, and how.
+ */
+staff.get('/e/:id/codes/hashes', issuerTool, async (c) => {
+  const { db } = deps(c);
+  const e = await getElection(db, c.req.param('id'));
+  const rows = await db.all<{ hash: string }>('SELECT hash FROM codes WHERE election_id = ? ORDER BY hash', [e.row.id]);
+  return c.json({ hashes: rows.map((r) => r.hash), rollSha256: e.row.roll_sha256, rollFrozenAt: e.row.roll_frozen_at });
+});
+
 /** Reissue: revoke copy n and issue copy n + 1, together. The public log shows only that a reissue happened. */
 staff.post('/e/:id/codes/reissue', issuerTool, async (c) => {
   const { db, now } = deps(c);

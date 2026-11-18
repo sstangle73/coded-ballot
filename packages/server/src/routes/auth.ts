@@ -39,9 +39,9 @@ export const loadStaff: MiddlewareHandler<Env> = async (c, next) => {
       'SELECT s.id, s.name, s.email, s.roles FROM api_tokens x JOIN staff s ON s.id = x.staff_id WHERE x.token_hash = ? AND x.expires_at > ?',
       [tokenHash(bearer), now().toISOString()],
     );
-    if (!r) fail(401, 'That tool token has expired. Make a new one on the staff page.');
+    if (!r) fail(401, 'This sign-in has ended (it lasts 12 hours, and signing out ends it). Open the issuer page again from the tellers’ app.');
     c.set('staff', toStaff(r));
-    c.set('bearer', true);
+    c.set('bearer', tokenHash(bearer));
     return next();
   }
   const t = getCookie(c, SESSION_COOKIE);
@@ -68,7 +68,7 @@ function gate(roles: Role[], allowToken: boolean): MiddlewareHandler<Env> {
   return async (c, next) => {
     const s = c.get('staff');
     if (!s) fail(401, 'Sign in with your passkey first.');
-    if (c.get('bearer') && !allowToken) fail(403, 'Tool tokens only work for the issuer tool. Sign in with your passkey.');
+    if (c.get('bearer') && !allowToken) fail(403, 'This sign-in only works for the issuer page. Sign in with your passkey.');
     if (!roles.some((r) => s.roles.includes(r))) fail(403, `This needs the ${roles.join(' or ')} role.`);
     if (c.req.method !== 'GET' && !c.get('bearer')) {
       const origin = c.req.header('origin');
@@ -281,18 +281,27 @@ auth.post('/login/verify', async (c) => {
 });
 
 auth.post('/logout', async (c) => {
+  // the issuer page signs out only its own token, never the passkey session in the tellers' app
+  const bearer = c.get('bearer');
+  if (bearer) {
+    await deps(c).db.run('DELETE FROM api_tokens WHERE token_hash = ?', [bearer]);
+    return c.json({ ok: true });
+  }
   const t = getCookie(c, SESSION_COOKIE);
   if (t) await deps(c).db.run('DELETE FROM sessions WHERE token_hash = ?', [tokenHash(t)]);
-  // signing out also ends every tool token this person made
+  // signing out of the tellers' app also ends every token this person made
   const s = c.get('staff');
-  if (s && !c.get('bearer')) await deps(c).db.run('DELETE FROM api_tokens WHERE staff_id = ?', [s.id]);
+  if (s) await deps(c).db.run('DELETE FROM api_tokens WHERE staff_id = ?', [s.id]);
   deleteCookie(c, SESSION_COOKIE, { path: '/' });
   return c.json({ ok: true });
 });
 
 auth.get('/me', (c) => c.json({ staff: c.get('staff') ?? null }));
 
-/** A token for the issuer's local tool, valid for 12 hours. Only from a passkey session, never from another token. */
+/**
+ * A token for the issuer page on the project's site (handed over in the link's # part) or the issuer tool, valid for
+ * 12 hours. Only from a passkey session, never from another token.
+ */
 auth.post('/tokens', requireRole('issuer'), async (c) => {
   const { db, now } = deps(c);
   const b = await body<{ label?: string }>(c);
@@ -300,7 +309,7 @@ auth.post('/tokens', requireRole('issuer'), async (c) => {
   await db.run('INSERT INTO api_tokens (token_hash, staff_id, label, expires_at) VALUES (?, ?, ?, ?)', [
     tokenHash(token),
     c.get('staff')!.id,
-    (b.label ?? 'issuer tool').slice(0, 80),
+    (b.label ?? 'issuer page').slice(0, 80),
     addHours(now(), 12),
   ]);
   return c.json({ token, expiresInHours: 12 });

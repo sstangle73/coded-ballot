@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <!-- The project's site sends no headers of its own, so the page carries its policy: only its own scripts run. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https: http://localhost:* http://127.0.0.1:*; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Issue ballots</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <main>
+    <h1>Issue ballots</h1>
+    <div id="app" aria-live="polite"><p>Loading&hellip;</p></div>
+  </main>
+  <script type="module" src="./issue.ts"></script>
+</body>
+</html>

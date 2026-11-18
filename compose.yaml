@@ -10,7 +10,7 @@ services:
       - "8080:8080"
     environment:
       PUBLIC_ORIGIN: https://ballot.example.org
-      PROJECT_ORIGINS: ""            # the project's voting page origin, e.g. https://<owner>.github.io
+      PROJECT_ORIGINS: "https://sstangle73.github.io"   # the project site: its issuer page, voting page and checker
       VOTING_PAGE_URL: ""            # empty: links open this server's own /vote/ page
       SMTP_HOST: email-smtp.us-east-1.amazonaws.com
       SMTP_PORT: "587"
