@@ -1,21 +1,22 @@
 # coded-ballot server, Docker target: Node + SQLite + local disk. Build from the repo root:
 #   docker build -t coded-ballot .
 # Node runs the TypeScript directly (type stripping), so the image holds the same source files as the repo.
+# Node comes from ECR Public's copy of the official image, outside Docker Hub's pull limit.
 
-FROM node:24-alpine AS web
+FROM public.ecr.aws/docker/library/node:24-alpine AS web
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages ./packages
-RUN npm ci --ignore-scripts && (npm run build -w @coded-ballot/web --if-present || true) && mkdir -p packages/web/dist
+RUN npm ci --ignore-scripts && npm run build -w @coded-ballot/web
 
-FROM node:24-alpine AS deps
+FROM public.ecr.aws/docker/library/node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY packages/core/package.json packages/core/
 COPY packages/server/package.json packages/server/
 RUN npm ci --omit=dev --ignore-scripts -w @coded-ballot/core -w @coded-ballot/server
 
-FROM node:24-alpine
+FROM public.ecr.aws/docker/library/node:24-alpine
 ENV NODE_ENV=production DATA_DIR=/data PORT=8080 STATIC_DIR=/app/packages/web/dist
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules

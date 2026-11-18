@@ -8,3 +8,4 @@ coverage/
 .env
 /out/
 *.local.jsonc
+.scratch/
