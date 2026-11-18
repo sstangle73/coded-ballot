@@ -41,8 +41,9 @@ export async function sendLobLetter(opts: {
   // Lob prints its own address page first, so our pages need no reserved address area.
   form.append('address_placement', 'insert_blank_page');
   form.append('return_envelope', 'true');
-  // Lob requires a perforated page with a return envelope: the ballot sheet (after Lob's page and our cover letter).
-  form.append('perforated_page', '3');
+  // Lob requires a perforated page with a return envelope. It counts our pages (its inserted address page doesn't count),
+  // so 1 is the cover letter: never a ballot sheet, which a tear across its ovals or corner squares could leave unreadable.
+  form.append('perforated_page', '1');
   form.append('description', opts.description.slice(0, 255));
   const res = await (opts.fetchImpl ?? fetch)('https://api.lob.com/v1/letters', {
     method: 'POST',
