@@ -134,7 +134,8 @@ the [GitHub mirror](https://github.com/sstangle73/coded-ballot) by
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml), with `release-hashes.json`: the SHA-256 of every file.
 - **The issuer page** runs only from there. The passphrase and the codes are made in the issuer's browser, from code
   the organisation's server doesn't serve and can't change; the copy on the organisation's own server refuses to run.
-  The tellers' app opens it with the server's address and a 12-hour token after the `#`, which never reaches GitHub.
+  The tellers' app opens it with the server's address and a one-time code after the `#`, which never reaches GitHub;
+  the page trades the code for a 12-hour sign-in, and asks the issuer to confirm the server before anything else.
 - **Members** can vote from the project's copy of the voting page, which only ever locks their vote with the count key
   printed on their ballot, or use the checker to compare their organisation's voting page with the release.
 

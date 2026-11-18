@@ -134,7 +134,15 @@ describe('a whole election', () => {
     expect(ok.headers.get('access-control-allow-headers')).toMatch(/authorization/);
     expect(ok.headers.get('access-control-allow-credentials')).toBeNull();
     expect((await pre('https://evil.test')).headers.get('access-control-allow-origin')).toBeNull();
-    const a = (await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: {} })).json.token as string;
+    // the tellers' app hands over a one-time code; the page trades it for its token
+    const code = (await call('POST', '/api/auth/handoff', { cookie: issuerCookie, body: {} })).json.code as string;
+    expect((await app.request('/api/auth/me', { headers: { authorization: `Bearer ${code}` } })).status).toBe(401); // not a token
+    const redeem = () => app.request('/api/auth/handoff/redeem', { method: 'POST', headers: { origin: 'https://project.test', 'content-type': 'application/json' }, body: JSON.stringify({ code }) });
+    const r1 = await redeem();
+    expect(r1.status).toBe(200);
+    const a = ((await r1.json()) as { token: string }).token;
+    expect((await redeem()).status).toBe(410); // once only
+    expect((await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: { label: 'hand-off' } })).status).toBe(400);
     const b = (await call('POST', '/api/auth/tokens', { cookie: issuerCookie, body: {} })).json.token as string;
     const me = (t: string) => app.request('/api/auth/me', { headers: { authorization: `Bearer ${t}`, origin: 'https://project.test' } });
     expect((await me(a)).headers.get('access-control-allow-origin')).toBe('https://project.test');

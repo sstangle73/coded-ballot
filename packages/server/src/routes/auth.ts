@@ -14,6 +14,10 @@ import { EMAIL, body, deps, fail, randomToken, str, tokenHash, type C, type Env,
 const SESSION_COOKIE = 'cb_session';
 const SESSION_HOURS = 12;
 const INVITE_DAYS = 7;
+const TOKEN_HOURS = 12;
+/** A hand-off code is not a token: it only buys one, within two minutes. */
+const HANDOFF = 'hand-off';
+const HANDOFF_HOURS = 2 / 60;
 
 interface StaffRow {
   id: string;
@@ -36,8 +40,8 @@ export const loadStaff: MiddlewareHandler<Env> = async (c, next) => {
   if (bearer) {
     const { db, now } = deps(c);
     const r = await db.first<StaffRow>(
-      'SELECT s.id, s.name, s.email, s.roles FROM api_tokens x JOIN staff s ON s.id = x.staff_id WHERE x.token_hash = ? AND x.expires_at > ?',
-      [tokenHash(bearer), now().toISOString()],
+      'SELECT s.id, s.name, s.email, s.roles FROM api_tokens x JOIN staff s ON s.id = x.staff_id WHERE x.token_hash = ? AND x.expires_at > ? AND x.label <> ?',
+      [tokenHash(bearer), now().toISOString(), HANDOFF],
     );
     if (!r) fail(401, 'This sign-in has ended (it lasts 12 hours, and signing out ends it). Open the issuer page again from the tellers’ app.');
     c.set('staff', toStaff(r));
@@ -298,21 +302,42 @@ auth.post('/logout', async (c) => {
 
 auth.get('/me', (c) => c.json({ staff: c.get('staff') ?? null }));
 
-/**
- * A token for the issuer page on the project's site (handed over in the link's # part) or the issuer tool, valid for
- * 12 hours. Only from a passkey session, never from another token.
- */
-auth.post('/tokens', requireRole('issuer'), async (c) => {
-  const { db, now } = deps(c);
-  const b = await body<{ label?: string }>(c);
+async function newToken(c: C, staffId: string, label: string, hours: number): Promise<string> {
   const token = randomToken();
-  await db.run('INSERT INTO api_tokens (token_hash, staff_id, label, expires_at) VALUES (?, ?, ?, ?)', [
+  await deps(c).db.run('INSERT INTO api_tokens (token_hash, staff_id, label, expires_at) VALUES (?, ?, ?, ?)', [
     tokenHash(token),
-    c.get('staff')!.id,
-    (b.label ?? 'issuer page').slice(0, 80),
-    addHours(now(), 12),
+    staffId,
+    label,
+    addHours(deps(c).now(), hours),
   ]);
-  return c.json({ token, expiresInHours: 12 });
+  return token;
+}
+
+/** A token for the command-line issuer tool, valid for 12 hours. Only from a passkey session, never from another token. */
+auth.post('/tokens', requireRole('issuer'), async (c) => {
+  const b = await body<{ label?: string }>(c);
+  const label = (b.label ?? 'issuer tool').slice(0, 80);
+  if (label === HANDOFF) fail(400, 'That label is reserved.');
+  return c.json({ token: await newToken(c, c.get('staff')!.id, label, TOKEN_HOURS), expiresInHours: TOKEN_HOURS });
+});
+
+/**
+ * The issuer page on the project's site: the tellers' app puts a one-time code, good for two minutes, after the # of
+ * the page's address, and the page trades it here for a 12-hour token it keeps in memory. So the token itself is never
+ * in an address, where browser history would keep it.
+ */
+auth.post('/handoff', requireRole('issuer'), async (c) => c.json({ code: await newToken(c, c.get('staff')!.id, HANDOFF, HANDOFF_HOURS) }));
+
+auth.post('/handoff/redeem', async (c) => {
+  const { db, now } = deps(c);
+  const code = str((await body<{ code?: string }>(c)).code, 'hand-off code', /^[\w-]{20,100}$/);
+  const h = tokenHash(code);
+  const r = await db.first<{ staff_id: string }>('SELECT staff_id FROM api_tokens WHERE token_hash = ? AND label = ? AND expires_at > ?', [h, HANDOFF, now().toISOString()]);
+  // deleted before the token is made, so a code is only ever spent once
+  if (!r || (await db.run('DELETE FROM api_tokens WHERE token_hash = ? AND label = ?', [h, HANDOFF])).changes !== 1) {
+    fail(410, 'This link to the issuer page has expired or was already used. Open the issuer page again from the tellers’ app.');
+  }
+  return c.json({ token: await newToken(c, r.staff_id, 'issuer page', TOKEN_HOURS), expiresInHours: TOKEN_HOURS });
 });
 
 auth.get('/staff', requireRole('issuer', 'teller'), async (c) => {

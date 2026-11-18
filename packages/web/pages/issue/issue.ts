@@ -3,8 +3,10 @@
 // sends it: the frozen roll's member IDs and emails, the SHA-256 of each code with its ballot style, the public half
 // of the signing key, and the signed close.
 //
-// The tellers' app opens it as #s=<server>&e=<election>&t=<token>. The # part never reaches the project's site, and
-// the token is a 12-hour sign-in that works only for the issuer's routes; signing out here ends it.
+// The tellers' app opens it as #s=<server>&e=<election>&c=<code>. The # part never reaches the project's site. The
+// code works once, for two minutes: the page trades it for a 12-hour token that works only for the issuer's routes
+// and lives in this tab's memory, never in an address that browser history would keep. Signing out here ends it.
+// Because anyone can send a link naming any server, the issuer confirms the server before typing the passphrase.
 import { PDFDocument } from 'pdf-lib';
 import {
   closeStatement,
@@ -43,6 +45,8 @@ interface State {
   fingerprintChecked: boolean;
   returnAddress: string;
   keyDestroyed: boolean;
+  /** The issuer has said this is their organisation's server. */
+  serverConfirmed: boolean;
   /** What the last action in each section left to show: a result, a download link. */
   notes: Record<string, Node[]>;
   urls: string[];
@@ -54,11 +58,11 @@ type Step = (typeof STEPS)[number];
 
 async function start() {
   const p = fragmentParams();
-  const token = p.get('t');
+  const code = p.get('c');
   const id = p.get('e');
-  // the token is in memory only from here on: a reload or a copied address doesn't carry it
+  // a reload or a copied address carries nothing: the code is spent, and the token is in memory only
   history.replaceState(null, '', location.pathname);
-  if (!token || !id || !p.get('s')) return show(app, ...notOpenedRight());
+  if (!code || !id || !p.get('s')) return show(app, ...notOpenedRight());
   let server: string;
   try {
     server = serverFromFragment(p);
@@ -73,8 +77,9 @@ async function start() {
       h('p', {}, 'Use the Issue ballots button in the tellers’ app: it opens the project’s own copy.'),
     );
   }
-  const api = new Api(server, token);
   try {
+    const { token } = await new Api(server).post<{ token: string }>('/api/auth/handoff/redeem', { code });
+    const api = new Api(server, token);
     const [me, info, codes, log] = await Promise.all([
       api.get<{ staff: Staff | null }>('/api/auth/me'),
       api.get<ElectionInfo>(`/api/public/e/${encodeURIComponent(id)}`),
@@ -97,13 +102,14 @@ async function start() {
       fingerprintChecked: false,
       returnAddress: '',
       keyDestroyed: log.log.some((l) => l.kind === 'issuer_key_destroyed'),
+      serverConfirmed: false,
       notes: {},
       urls: [],
     };
     render(s);
   } catch (e) {
     const m = (e as Error).message;
-    show(app, status('bad', m), ...(/sign-in has ended|401/.test(m) ? notOpenedRight() : []));
+    show(app, status('bad', m), ...(/sign-in has ended|expired or was already used|401|410/.test(m) ? notOpenedRight() : []));
   }
 }
 
@@ -120,9 +126,36 @@ function notOpenedRight(): Node[] {
   ];
 }
 
+/** Before anything else: is this the issuer's own server? A link can name any server, and a fake one could ask for a signed close. */
+function confirmServer(s: State) {
+  show(
+    app,
+    h('h2', {}, 'Is this your organisation’s ballot server?'),
+    h('p', { class: 'fingerprint', style: 'word-break: break-all' }, s.host),
+    h('p', {}, `It says it is running “${s.info.title}” for ${s.info.organisation}, and that you are ${s.me.name}.`),
+    h('p', {}, 'Carry on only if that is the address of the tellers’ app you just signed in to, the one your organisation always uses.'),
+    h(
+      'p',
+      {},
+      h('button', { onclick: () => ((s.serverConfirmed = true), render(s)) }, 'Yes, that’s our server'),
+      ' ',
+      h(
+        'button',
+        {
+          class: 'secondary',
+          onclick: () =>
+            show(app, status('bad', 'Don’t use this page. Close it, and don’t type your passphrase into it. Open the tellers’ app yourself, from the address your organisation always uses, and choose Issue ballots there. If someone sent you this link, tell the tellers.')),
+        },
+        'No',
+      ),
+    ),
+  );
+}
+
 // ---------- the page ----------
 
 function render(s: State) {
+  if (!s.serverConfirmed) return confirmServer(s);
   const { info } = s;
   const shown: Step[] =
     info.status === 'setup'

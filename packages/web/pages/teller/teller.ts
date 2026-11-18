@@ -290,7 +290,7 @@ export function issuerPageUrl(): string {
   return local ? `${location.origin}/issue/` : new URL('issue/', __PROJECT_SITE__).href;
 }
 
-/** Opens the issuer page on the project's site, signed in with a 12-hour token handed over after the #. */
+/** Opens the issuer page on the project's site with a one-time code after the #, which it trades for a 12-hour token. */
 function issueButton(ctx: Ctx, info: ElectionInfo): HTMLElement {
   const msg = h('div', {});
   const page = new URL(issuerPageUrl());
@@ -307,9 +307,10 @@ function issueButton(ctx: Ctx, info: ElectionInfo): HTMLElement {
         {
           onclick: async () => {
             try {
-              const r = await ctx.api.post<{ token: string }>('/api/auth/tokens', { label: 'issuer page' });
-              // the same tab, so no pop-up blocker gets in the way; the issuer page links back here
-              location.assign(`${page.href}#${new URLSearchParams({ s: location.origin, e: info.id, t: r.token })}`);
+              const r = await ctx.api.post<{ code: string }>('/api/auth/handoff', {});
+              // the same tab, so no pop-up blocker gets in the way; the issuer page links back here. The code in the
+              // address works once, within two minutes, so browser history keeps nothing usable.
+              location.assign(`${page.href}#${new URLSearchParams({ s: location.origin, e: info.id, c: r.code })}`);
             } catch (e) {
               msg.replaceChildren(status('bad', (e as Error).message));
             }
