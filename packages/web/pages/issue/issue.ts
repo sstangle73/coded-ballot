@@ -319,7 +319,7 @@ function makePassphrase(s: State): Node[] {
   const p = generatePassphrase();
   const words = p.split(' ');
   const box = h('div', {});
-  const list = h('ol', { class: 'fingerprint', style: 'columns: 3; font-size: 1.15rem' }, ...words.map((w) => h('li', {}, w)));
+  const list = h('ol', { class: 'words' }, ...words.map((w) => h('li', {}, w)));
   const check = () => {
     const inputs = [2, 8, 11].map((i) => ({ i, el: h('input', { id: `w${i}`, type: 'text', autocomplete: 'off', autocapitalize: 'none', spellcheck: 'false' }) }));
     const msg = h('div', {});
