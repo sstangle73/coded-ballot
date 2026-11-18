@@ -5,7 +5,7 @@
 
 FROM public.ecr.aws/docker/library/node:24-alpine AS web
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 RUN npm ci --ignore-scripts && npm run build -w @coded-ballot/web
 
