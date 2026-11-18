@@ -14,7 +14,7 @@ import { configFromEnv } from './config.ts';
 import { parseHeadersFile } from '../static-headers.ts';
 import { existsSync } from 'node:fs';
 import { resolveSetupToken } from './setup-token.ts';
-import { setupMessage } from '../setup-link.ts';
+import { setupHint } from '../setup-link.ts';
 
 const env = process.env;
 const secret = (name: string) => env[name] ?? (env[`${name}_FILE`] ? readFileSync(env[`${name}_FILE`]!, 'utf8').trim() : undefined);
@@ -36,7 +36,7 @@ if (env.SMTP_HOST && env.MAIL_FROM) {
 const hasStaff = (await db.first('SELECT id FROM staff LIMIT 1')) !== null;
 const setupToken = resolveSetupToken({ configured: secret('SETUP_TOKEN'), dataDir, hasStaff });
 const config = { ...configFromEnv({ ...env, SETUP_TOKEN: setupToken }) };
-if (!hasStaff && setupToken) console.log(setupMessage(config.publicOrigin, setupToken));
+if (!hasStaff && setupToken) console.log(setupHint());
 const deps = { db, blobs: new DiskBlobs(join(dataDir, 'blobs')), mailer, config, now: () => new Date() };
 const app = createApp(deps);
 const staticDir = env.STATIC_DIR;

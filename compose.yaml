@@ -1,6 +1,6 @@
 # coded-ballot on Docker. Put it behind your reverse proxy with HTTPS: passkeys need a secure origin.
 # The mail password goes in a file next to this one (never in this file): smtp_pass.txt. On its first start the server
-# prints a one-time setup link for the first person: docker compose logs coded-ballot
+# makes a one-time setup link for the first person: docker compose exec coded-ballot setup-link
 services:
   coded-ballot:
     image: coded-ballot:latest

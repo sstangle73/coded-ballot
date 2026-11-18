@@ -27,7 +27,9 @@ COPY packages/server/package.json packages/server/
 COPY packages/server/src packages/server/src
 COPY packages/server/migrations packages/server/migrations
 COPY --from=web /app/packages/web/dist packages/web/dist
-RUN mkdir -p /data && chown node:node /data
+RUN mkdir -p /data && chown node:node /data \
+ && printf '#!/bin/sh\nexec node /app/packages/server/src/targets/setup-link-cli.ts "$@"\n' > /usr/local/bin/setup-link \
+ && chmod 755 /usr/local/bin/setup-link
 USER node
 VOLUME /data
 EXPOSE 8080

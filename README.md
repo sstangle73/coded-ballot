@@ -93,11 +93,11 @@ npm run setup-link -w @coded-ballot/server -- -c packages/server/wrangler.jsonc
 
 [`compose.yaml`](compose.yaml) runs the image built from the [`Dockerfile`](Dockerfile), with data in a volume and
 the mail password in a file beside it (`smtp_pass.txt`). Put it behind your reverse proxy with HTTPS and set
-`PUBLIC_ORIGIN` to its address. On its first start it prints the setup link (see *First steps* below):
+`PUBLIC_ORIGIN` to its address. Then get the setup link (see *First steps* below):
 
 ```bash
 docker compose up -d --build
-docker compose logs coded-ballot
+docker compose exec coded-ballot setup-link
 ```
 
 ### Settings
@@ -113,8 +113,9 @@ docker compose logs coded-ballot
 
 ### First steps on a new server
 
-1. Open the **setup link**. Docker prints it in its log on every start until someone has set the server up; on
-   Workers, `npm run setup-link` prints it. It looks like `https://ballot.example.org/teller/#setup=...` and works
+1. Open the **setup link**. On Docker, `docker compose exec coded-ballot setup-link` prints it (the server's log says
+   so until someone has set it up, but never shows the link: logs get shipped and kept); on Workers,
+   `npm run setup-link` prints it. It looks like `https://ballot.example.org/teller/#setup=...` and works
    once, for the first person, so send it privately to whoever will run your elections. They enter their name and
    email and make a passkey (their fingerprint, face or screen lock; no password). They are then the issuer and a
    teller, and invite the other tellers from the same page. (With only the token, "First time on this server? Set it

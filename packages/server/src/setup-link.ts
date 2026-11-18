@@ -5,7 +5,22 @@ export function setupLink(publicOrigin: string, token: string): string {
   return `${publicOrigin}/teller/#setup=${encodeURIComponent(token)}`;
 }
 
-/** What the server prints while nobody has set it up: plain words for whoever installed it. */
+/**
+ * What the server logs while nobody has set it up. Never the link itself: logs get shipped, kept and shared, and the
+ * link lets whoever opens it first take over the server. The command shows it to the person at the terminal.
+ */
+export function setupHint(): string {
+  return [
+    '',
+    '  coded-ballot is ready to set up. To get the one-time setup link for the first person, run this in the folder',
+    '  you started it from:',
+    '',
+    '    docker compose exec coded-ballot setup-link',
+    '',
+  ].join('\n');
+}
+
+/** What `setup-link` prints: plain words for whoever installed the server. */
 export function setupMessage(publicOrigin: string, token: string): string {
   return [
     '',

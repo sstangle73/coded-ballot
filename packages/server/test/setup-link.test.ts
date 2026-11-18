@@ -44,3 +44,11 @@ describe('the Docker setup token', () => {
     expect(existsSync(join(d, 'setup-token.txt'))).toBe(false);
   });
 });
+
+describe('the server log', () => {
+  it('says how to get the link but never shows it', async () => {
+    const { setupHint } = await import('../src/setup-link.ts');
+    expect(setupHint()).toContain('docker compose exec coded-ballot setup-link');
+    expect(setupHint()).not.toContain('#setup=');
+  });
+});
