@@ -2,8 +2,9 @@
 //   npx wrangler d1 create coded-ballot          (put the database_id below)
 //   npx wrangler r2 bucket create coded-ballot-images
 //   npx wrangler d1 migrations apply coded-ballot --remote
-//   npx wrangler secret put SETUP_TOKEN            (and SES_KEY_ID, SES_SECRET for mail)
+//   npx wrangler secret put SES_KEY_ID             (and SES_SECRET, for mail)
 //   npx wrangler deploy
+//   npm run setup-link -w @coded-ballot/server -- -c packages/server/wrangler.jsonc   (prints the first person's link)
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "coded-ballot",

@@ -9,3 +9,5 @@ coverage/
 /out/
 *.local.jsonc
 .scratch/
+setup_token.txt
+smtp_pass.txt

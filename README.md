@@ -80,22 +80,24 @@ The server needs HTTPS: passkeys and the camera only work on a secure origin.
 ### Cloudflare Workers
 
 Copy [`packages/server/wrangler.jsonc`](packages/server/wrangler.jsonc), set your names, then follow the commands at
-the top of that file: create the D1 database and R2 bucket, apply the migrations, set the secrets (`SETUP_TOKEN`, and
-`SES_KEY_ID` / `SES_SECRET` for Amazon SES mail), build the pages and deploy.
+the top of that file: create the D1 database and R2 bucket, apply the migrations, set the mail secrets (`SES_KEY_ID`
+and `SES_SECRET` for Amazon SES), build the pages and deploy. Then make the setup link (see *First steps* below):
 
 ```bash
 npm run build -w @coded-ballot/web
 npx wrangler deploy -c packages/server/wrangler.jsonc
+npm run setup-link -w @coded-ballot/server -- -c packages/server/wrangler.jsonc
 ```
 
 ### Docker
 
 [`compose.yaml`](compose.yaml) runs the image built from the [`Dockerfile`](Dockerfile), with data in a volume and
-secrets in files beside it (`setup_token.txt`, `smtp_pass.txt`). Put it behind your reverse proxy with HTTPS and set
-`PUBLIC_ORIGIN` to its address.
+the mail password in a file beside it (`smtp_pass.txt`). Put it behind your reverse proxy with HTTPS and set
+`PUBLIC_ORIGIN` to its address. On its first start it prints the setup link (see *First steps* below):
 
 ```bash
 docker compose up -d --build
+docker compose logs coded-ballot
 ```
 
 ### Settings
@@ -105,14 +107,18 @@ docker compose up -d --build
 | `PUBLIC_ORIGIN` | The server's own address, like `https://ballot.example.org`. Passkeys are tied to it. |
 | `PROJECT_ORIGINS` | Comma-separated origins allowed to call the public API: the project site's voting page and member checker. |
 | `VOTING_PAGE_URL` | Where voting links point. Empty means this server's own `/vote/` page. |
-| `SETUP_TOKEN` (or `SETUP_TOKEN_FILE`) | A one-time token for the first issuer to sign up. |
+| `SETUP_TOKEN` (or `SETUP_TOKEN_FILE`) | Optional on Docker: the one-time token in the setup link. Without it, Docker makes one and keeps it in the data folder until someone has set the server up. On Workers, `npm run setup-link` sets it. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` (or `_FILE`), `MAIL_FROM` | Mail on Docker. |
 | `SES_KEY_ID`, `SES_SECRET`, `SES_REGION`, `MAIL_FROM` | Mail on Workers, through Amazon SES. |
 
 ### First steps on a new server
 
-1. Open the tellers' app at `/teller/`, choose "First time on this server? Set it up", enter the setup token, and make
-   your passkey. You are the issuer and a teller; invite the other tellers from the same page.
+1. Open the **setup link**. Docker prints it in its log on every start until someone has set the server up; on
+   Workers, `npm run setup-link` prints it. It looks like `https://ballot.example.org/teller/#setup=...` and works
+   once, for the first person, so send it privately to whoever will run your elections. They enter their name and
+   email and make a passkey (their fingerprint, face or screen lock; no password). They are then the issuer and a
+   teller, and invite the other tellers from the same page. (With only the token, "First time on this server? Set it
+   up" on `/teller/` takes it typed in.)
 2. In the tellers' app, signed in as the issuer, make a tool token for the issuer tool. On the issuer's own computer,
    run the issuer tool: `npx coded-ballot-issuer --help`.
 

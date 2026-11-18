@@ -3,7 +3,7 @@
 import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
 import type { Rules } from '@coded-ballot/core';
 import { Api } from '../shared/api.ts';
-import { $, fragmentParams, fragmentWithout, h, show, status } from '../shared/ui.ts';
+import { $, fragmentParams, fragmentWithout, h, restartOnNewFragment, show, status } from '../shared/ui.ts';
 import { setupView } from './setup.ts';
 import { openView } from './receipts.ts';
 import { countView } from './count.ts';
@@ -42,11 +42,15 @@ export interface Ctx {
 const app = $('#app');
 const api = new Api(location.origin);
 
+// A setup or invitation link opened in this tab changes only the fragment: start again from it.
+restartOnNewFragment();
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
 
 async function start() {
   const invite = fragmentParams().get('invite');
   if (invite) return enrol(invite);
+  const setup = fragmentParams().get('setup');
+  if (setup) return setUpFromLink(setup);
   let me: { staff: Staff | null };
   try {
     me = await api.get('/api/auth/me');
@@ -85,11 +89,61 @@ function signIn() {
   );
 }
 
-/** The very first person on a new server: the setup token from the server's settings makes them issuer and teller. */
+/** The first person's sign-up, with the setup token from the link or typed in; then on to their passkey. */
+async function bootstrap(token: string, name: string, email: string, msg: HTMLElement) {
+  msg.replaceChildren(status('info', 'Setting up…'));
+  try {
+    const r = await api.post<{ invite: string }>('/api/auth/bootstrap', { setupToken: token.trim(), name, email });
+    history.replaceState(null, '', fragmentWithout('setup'));
+    enrol(r.invite, true);
+  } catch (err) {
+    const m = (err as Error).message;
+    msg.replaceChildren(
+      status(
+        'bad',
+        /setup token/i.test(m)
+          ? 'This setup link or token doesn’t work. It may be mistyped, or a newer one has replaced it. Ask whoever installed the server for the current setup link.'
+          : /already has staff/i.test(m)
+            ? 'This server is already set up. Ask someone who runs elections here to invite you: the invitation comes by email.'
+            : m,
+      ),
+    );
+  }
+}
+
+function nameAndEmail(prefix: string) {
+  const name = h('input', { id: `${prefix}-name`, type: 'text', autocomplete: 'name', required: true });
+  const email = h('input', { id: `${prefix}-email`, type: 'email', autocomplete: 'email', required: true });
+  return {
+    name,
+    email,
+    fields: [h('label', { for: `${prefix}-name` }, 'Your name'), name, h('label', { for: `${prefix}-email` }, 'Your email address'), email],
+  };
+}
+
+/** Opened from the setup link that the server printed for whoever installed it. */
+function setUpFromLink(token: string) {
+  const f = nameAndEmail('sl');
+  const msg = h('div', {});
+  show(
+    app,
+    h('h2', {}, 'Set up this server'),
+    h('p', {}, 'You’re the first person here, so you’ll run it: you can set up elections, invite the other tellers and helpers, and count the votes.'),
+    h('p', {}, 'Enter your name and email address. Next you’ll make a passkey, so you sign in with your fingerprint, face or screen lock instead of a password. Do this on the phone or computer you’ll use for elections.'),
+    h(
+      'form',
+      { onsubmit: (e: Event) => (e.preventDefault(), bootstrap(token, f.name.value, f.email.value, msg)) },
+      ...f.fields,
+      h('p', {}, h('button', { type: 'submit' }, 'Continue')),
+      msg,
+    ),
+  );
+}
+
+/** The very first person on a new server, with a setup token but no link: it makes them issuer and teller. */
 function setUpServer(): HTMLElement {
-  const token = h('input', { id: 'su-token', type: 'password', autocomplete: 'off' });
-  const name = h('input', { id: 'su-name', type: 'text', autocomplete: 'name' });
-  const email = h('input', { id: 'su-email', type: 'email', autocomplete: 'email' });
+  const token = h('input', { id: 'su-token', type: 'password', autocomplete: 'off', required: true });
+  const f = nameAndEmail('su');
   const msg = h('div', {});
   return h(
     'details',
@@ -97,36 +151,29 @@ function setUpServer(): HTMLElement {
     h('summary', {}, 'First time on this server? Set it up'),
     h(
       'form',
-      {
-        onsubmit: async (e: Event) => {
-          e.preventDefault();
-          try {
-            const r = await api.post<{ invite: string }>('/api/auth/bootstrap', { setupToken: token.value, name: name.value, email: email.value });
-            enrol(r.invite);
-          } catch (err) {
-            msg.replaceChildren(status('bad', (err as Error).message));
-          }
-        },
-      },
-      h('p', { class: 'small' }, 'Only the first person needs this: the setup token is in the server’s settings. You become the issuer and a teller, then invite everyone else.'),
+      { onsubmit: (e: Event) => (e.preventDefault(), bootstrap(token.value, f.name.value, f.email.value, msg)) },
+      h('p', { class: 'small' }, 'Only the first person needs this. The easiest way is the setup link from whoever installed this server: just open it. If you have the setup token instead, paste it here. You become the issuer and a teller, then invite everyone else.'),
       h('label', { for: 'su-token' }, 'Setup token'),
       token,
-      h('label', { for: 'su-name' }, 'Your name'),
-      name,
-      h('label', { for: 'su-email' }, 'Your email address'),
-      email,
-      h('button', { type: 'submit' }, 'Set up and make my passkey'),
+      ...f.fields,
+      h('p', {}, h('button', { type: 'submit' }, 'Set up and make my passkey')),
       msg,
     ),
   );
 }
 
-function enrol(invite: string) {
+function enrol(invite: string, first = false) {
   const msg = h('div', {});
   show(
     app,
     h('h2', {}, 'Make your passkey'),
-    h('p', {}, 'You have been invited to help run elections here. A passkey lets you sign in with your fingerprint, face or screen lock, with no password. Make it on the phone or computer you will use.'),
+    h(
+      'p',
+      {},
+      first
+        ? 'Almost done. Your phone or computer will ask for your fingerprint, face or screen lock: that’s your passkey, and it’s how you’ll sign in here from now on.'
+        : 'You have been invited to help run elections here. A passkey lets you sign in with your fingerprint, face or screen lock, with no password. Make it on the phone or computer you will use.',
+    ),
     h(
       'button',
       {
