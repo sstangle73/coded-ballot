@@ -7,3 +7,4 @@ coverage/
 .dev.vars
 .env
 /out/
+*.local.jsonc
