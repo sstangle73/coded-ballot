@@ -7,6 +7,7 @@ import { $, fragmentParams, fragmentWithout, h, restartOnNewFragment, show, stat
 import { setupView } from './setup.ts';
 import { openView } from './receipts.ts';
 import { countView } from './count.ts';
+import { electionForm } from './rules-form.ts';
 
 export interface Staff {
   id: string;
@@ -230,7 +231,7 @@ async function home(staff: Staff) {
             ),
           ),
         )
-      : h('p', {}, staff.roles.includes('issuer') ? 'No elections yet. Create one from its rules file below.' : 'No elections yet.'),
+      : h('p', {}, 'No elections yet.'),
     staff.roles.includes('issuer') ? newElection(ctx) : null,
     staff.roles.includes('issuer') ? toolToken() : null,
     inviteForm(ctx),
@@ -259,8 +260,33 @@ function signedInBar(ctx: Ctx) {
   );
 }
 
-/** A new election from its rules file (YAML). */
+/** A new election: the election form, or a rules file someone already has. */
 function newElection(ctx: Ctx): HTMLElement {
+  return h(
+    'div',
+    {},
+    h(
+      'p',
+      {},
+      h(
+        'button',
+        {
+          onclick: () =>
+            electionForm(ctx, {
+              save: async (rulesYaml) => (await api.post<{ id: string }>('/api/staff/elections', { rulesYaml })).id,
+              done: (id) => election(ctx, id),
+              cancel: () => ctx.home(),
+            }),
+        },
+        'Create an election',
+      ),
+    ),
+    rulesFileUpload(ctx),
+  );
+}
+
+/** A new election from a rules file (YAML), for anyone who already has one. */
+function rulesFileUpload(ctx: Ctx): HTMLElement {
   const file = h('input', { id: 'rules-file', type: 'file', accept: '.yaml,.yml,text/yaml' });
   const msg = h('div', {});
   file.addEventListener('change', async () => {
@@ -276,8 +302,8 @@ function newElection(ctx: Ctx): HTMLElement {
   return h(
     'details',
     {},
-    h('summary', {}, 'Create an election'),
-    h('p', { class: 'small' }, 'Choose the election’s rules file. It says who may vote, what’s on the ballot, how it’s counted and the dates. Start from examples/rules.example.yaml in the project.'),
+    h('summary', {}, 'Or create one from a rules file'),
+    h('p', { class: 'small' }, 'If you already have the election’s rules file (from another election, or saved from the form), choose it here.'),
     h('label', { for: 'rules-file' }, 'Rules file'),
     file,
     msg,

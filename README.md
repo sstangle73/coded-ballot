@@ -16,8 +16,9 @@ Check before you use it. This project gives no legal advice and makes no legal c
 
 ## How an election runs
 
-1. **Set-up.** The issuer writes a rules file (dates, channels, who votes on what, the counting method for each
-   contest) and creates the election from it in the tellers' app. On the issuer page they freeze the roll and make a
+1. **Set-up.** The issuer fills in the election form in the tellers' app: the dates, how members can vote, who votes
+   on what, and each question with its counting method. The form writes the election's rules file, which the server
+   keeps as its record. On the issuer page they freeze the roll and make a
    12-word passphrase. A teller makes the count key on their own device; only its public half goes to the server.
 2. **Ballots.** The issuer page makes a packet for each member: a cover letter with their address, and ballot sheets
    with a QR code and a typed code but no name. Packets can be printed at home or emailed one at a time; the
@@ -121,8 +122,9 @@ docker compose exec coded-ballot setup-link
    email and make a passkey (their fingerprint, face or screen lock; no password). They are then the issuer and a
    teller, and invite the other tellers from the same page. (With only the token, "First time on this server? Set it
    up" on `/teller/` takes it typed in.)
-2. In the tellers' app, the issuer creates the election from its rules file (start from
-   [`examples/rules.example.yaml`](examples/rules.example.yaml)), then opens it and chooses **Issue ballots**. That opens
+2. In the tellers' app, the issuer chooses **Create an election** and fills in the form (or uses a rules file they
+   already have, like [`examples/rules.example.yaml`](examples/rules.example.yaml)), then opens it and chooses
+   **Issue ballots**. That opens
    the issuer page on the project site, signed in for 12 hours, where they choose the roll, make the passphrase and
    make the ballots. To email every member or post through Lob, make a token under *Make a token for the command-line
    issuer tool* and run `npx coded-ballot-issuer --help` on the issuer's own computer.

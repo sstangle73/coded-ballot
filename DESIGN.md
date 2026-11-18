@@ -104,6 +104,7 @@ Return envelopes are plain and pre-addressed, printed with "Don't write your nam
 ## 6. Rules
 
 - **Settings:** a YAML rules file checked against a published schema. It covers deadlines, which channels are allowed, eligibility by class, seats, write-ins, quorum, thresholds, tie-break order, retention and notice wording. The schema grows by release.
+- **The election form** in the tellers' app writes the rules file, so nobody has to write YAML (2026-11-17). Editing keeps what the form doesn't show (a candidate's note, a custom threshold), and classes, questions and candidates keep their IDs once made, because ballot styles and printed ballots use them. A rules file can still be uploaded, and the form saves one.
 - **Modules:** behaviour lives in reviewed code modules, each with its own tests. Organisations don't write scripts.
   - `count(records, contest) → result + plain-language step-by-step explanation`
   - `eligible(member, contest) → weight`

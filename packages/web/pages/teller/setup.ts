@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { countKeyToText, fingerprint, newCountKey, toBase64 } from '@coded-ballot/core';
 import { h, status } from '../shared/ui.ts';
 import type { Ctx, ElectionInfo } from './teller.ts';
+import { electionForm } from './rules-form.ts';
 
 const grouped = (s: string) => s.match(/.{1,4}/g)!.join(' ');
 
@@ -26,8 +27,36 @@ export function setupView(ctx: Ctx, info: ElectionInfo): HTMLElement {
   return h('div', {}, ...parts);
 }
 
-/** Until voting opens, the issuer may replace the rules file (same election ID). */
+/** Until voting opens, the issuer may change the election's settings: in the form, or with a whole rules file. */
 function rulesFile(ctx: Ctx, info: ElectionInfo): HTMLElement {
+  const put = (rulesYaml: string) => ctx.api.req('PUT', `/api/staff/e/${encodeURIComponent(info.id)}/rules`, { rulesYaml });
+  return h(
+    'div',
+    {},
+    h(
+      'p',
+      {},
+      h(
+        'button',
+        {
+          class: 'secondary',
+          onclick: () =>
+            electionForm(ctx, {
+              rules: info.rules,
+              ballotsMade: !!info.issuerKey,
+              save: async (yaml) => (await put(yaml), info.id),
+              done: () => ctx.reload(),
+              cancel: () => ctx.reload(),
+            }),
+        },
+        'Change the settings',
+      ),
+    ),
+    rulesFileReplace(ctx, info),
+  );
+}
+
+function rulesFileReplace(ctx: Ctx, info: ElectionInfo): HTMLElement {
   const file = h('input', { id: 'rules-replace', type: 'file', accept: '.yaml,.yml,text/yaml' });
   const msg = h('div', {});
   file.addEventListener('change', async () => {
@@ -43,7 +72,7 @@ function rulesFile(ctx: Ctx, info: ElectionInfo): HTMLElement {
   return h(
     'details',
     {},
-    h('summary', {}, 'The rules file'),
+    h('summary', {}, 'The rules file behind these settings'),
     h('p', { class: 'small' }, `Rules SHA-256 ${info.rulesSha256}. Until voting opens you can replace it with a corrected file for the same election. Do it before printing ballots: printed ballots keep the old wording.`),
     h('label', { for: 'rules-replace' }, 'Replace the rules file'),
     file,
